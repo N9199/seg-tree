@@ -22,7 +22,7 @@ impl<T: Node + Clone> IterativeSegmentTree<T> {
     }
 
     /// Sets the i-th element of the segment tree to value T and update the segment tree correspondingly.
-    /// It will panic if i is not in [0,n)
+    /// It will panic if i is not in \[0,n)
     pub fn set(&mut self, i: usize, value: T) {
         let mut i = i;
         i += self.n;
@@ -33,9 +33,9 @@ impl<T: Node + Clone> IterativeSegmentTree<T> {
         }
     }
 
-    /// Returns the result from the range [l,r].
+    /// Returns the result from the range \[l,r\].
     /// It returns None if and only if range is empty.
-    /// It will **panic** if l or r are not in [0,n).
+    /// It will **panic** if l or r are not in \[0,n).
     pub fn query(&self, l: usize, r: usize) -> Option<T> {
         let (mut l, mut r) = (l, r);
         let mut ansl: Option<T> = None;

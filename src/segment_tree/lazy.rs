@@ -45,8 +45,8 @@ impl<T: LazyNode + Clone> LazySegmentTree<T> {
         self.nodes[u].lazy_update(i, j);
     }
 
-    /// Updates the range [i,j] with value.
-    /// It will panic if i or j is not in [0,n)
+    /// Updates the range \[i,j\] with value.
+    /// It will panic if i or j is not in \[0,n)
     pub fn update(&mut self, i: usize, j: usize, value: <T as Node>::Value) {
         self.update_helper(i, j, &value, 0, 0, self.n - 1);
     }
