@@ -10,7 +10,8 @@ pub struct MaxSubarraySum {
 
 impl Node for MaxSubarraySum {
     type Value = i64;
-    fn initialize(v: Self::Value) -> Self {
+    fn initialize(value: &Self::Value) -> Self {
+        let v = value.to_owned();
         MaxSubarraySum {
             max_sum: v,
             max_prefix_sum: v,
@@ -29,7 +30,7 @@ impl Node for MaxSubarraySum {
             sum: a.sum + b.sum,
         }
     }
-    fn values(&self) -> Self::Value {
-        self.max_sum
+    fn values(&self) -> &Self::Value {
+        &self.max_sum
     }
 }

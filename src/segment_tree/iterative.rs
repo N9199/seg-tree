@@ -33,7 +33,7 @@ impl<T: Node + Clone> IterativeSegmentTree<T> {
         }
     }
 
-    /// Returns the result from the range [l,r).
+    /// Returns the result from the range [l,r].
     /// It returns None if and only if range is empty.
     /// It will **panic** if l or r are not in [0,n).
     pub fn query(&self, l: usize, r: usize) -> Option<T> {
@@ -41,7 +41,7 @@ impl<T: Node + Clone> IterativeSegmentTree<T> {
         let mut ansl: Option<T> = None;
         let mut ansr: Option<T> = None;
         l += self.n;
-        r += self.n;
+        r += self.n+1;
         while l < r {
             if l & 1 != 0 {
                 ansl = Some(match ansl {
@@ -77,28 +77,28 @@ mod tests {
 
     #[test]
     fn non_empty_query_returns_some() {
-        let nodes: Vec<Min<usize>> = (0..10).map(Min::initialize).collect();
+        let nodes: Vec<Min<usize>> = (0..=10).map(|x|Min::initialize(&x)).collect();
         let segment_tree = IterativeSegmentTree::build(&nodes);
         assert!(segment_tree.query(0, 10).is_some());
     }
     #[test]
     fn empty_query_returns_none() {
-        let nodes: Vec<Min<usize>> = (0..10).map(Min::initialize).collect();
+        let nodes: Vec<Min<usize>> = (0..=10).map(|x|Min::initialize(&x)).collect();
         let segment_tree = IterativeSegmentTree::build(&nodes);
         assert!(segment_tree.query(10, 0).is_none());
     }
     #[test]
     fn set_works() {
-        let nodes: Vec<Min<usize>> = (0..10).map(Min::initialize).collect();
+        let nodes: Vec<Min<usize>> = (0..=10).map(|x|Min::initialize(&x)).collect();
         let mut segment_tree = IterativeSegmentTree::build(&nodes);
         let value = 20;
-        segment_tree.set(0, Min::initialize(value));
-        assert_eq!(segment_tree.query(0, 1).unwrap().values(), value);
+        segment_tree.set(0, Min::initialize(&value));
+        assert_eq!(segment_tree.query(0, 0).unwrap().values(), &value);
     }
     #[test]
     fn query_works() {
-        let nodes: Vec<Min<usize>> = (0..10).map(Min::initialize).collect();
+        let nodes: Vec<Min<usize>> = (0..=10).map(|x|Min::initialize(&x)).collect();
         let segment_tree = IterativeSegmentTree::build(&nodes);
-        assert_eq!(segment_tree.query(1, 10).unwrap().values(), 1);
+        assert_eq!(segment_tree.query(1, 10).unwrap().values(), &1);
     }
 }

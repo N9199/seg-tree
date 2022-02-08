@@ -33,16 +33,19 @@ impl<T: LazyNode + Clone> LazySegmentTree<T> {
         self.nodes[u] = T::combine(&self.nodes[l], &self.nodes[r]);
     }
 
-    fn push(&mut self, u: usize, i: usize, j: usize, value: &<T as Node>::Value) {
-        self.nodes[u].lazy_update(value, i, j);
-        if i == j {
-            return;
+    fn push(&mut self, u: usize, i: usize, j: usize) {
+        // parent_slice.len() == u + 1 && sons_slice.len() == 4*self.n - (u + 1)
+        let (parent_slice, sons_slice) = self.nodes.split_at_mut(u + 1);
+        if let Some(value) = parent_slice[u].lazy_value() {
+            if i != j {
+                sons_slice[u].update_lazy_value(value); // At 2*u + 1 - (u + 1)
+                sons_slice[u + 1].update_lazy_value(value); // At 2*u + 2 - (u + 1)
+            }
         }
-        self.nodes[2 * u + 1].update_lazy_value(value);
-        self.nodes[2 * u + 2].update_lazy_value(value);
+        self.nodes[u].lazy_update(i, j);
     }
 
-    /// Updates the range [i.j] with value.
+    /// Updates the range [i,j] with value.
     /// It will panic if i or j is not in [0,n)
     pub fn update(&mut self, i: usize, j: usize, value: <T as Node>::Value) {
         self.update_helper(i, j, &value, 0, 0, self.n - 1);
@@ -57,15 +60,15 @@ impl<T: LazyNode + Clone> LazySegmentTree<T> {
         i: usize,
         j: usize,
     ) {
-        if let Some(value) = self.nodes[u].lazy_value() {
-            self.push(u, i, j, &value);
+        if self.nodes[u].lazy_value().is_some() {
+            self.push(u, i, j);
         }
         if j < l || r < i {
             return;
         }
         if l <= i && j <= r {
             self.nodes[u].update_lazy_value(value);
-            self.push(u, i, j, value);
+            self.push(u, i, j);
             return;
         }
         let m = (i + j) / 2;
@@ -90,8 +93,8 @@ impl<T: LazyNode + Clone> LazySegmentTree<T> {
         let m = (i + j) / 2;
         let left = 2 * u + 1;
         let right = 2 * u + 2;
-        if let Some(value) = self.nodes[u].lazy_value() {
-            self.push(u, i, j, &value);
+        if self.nodes[u].lazy_value().is_some() {
+            self.push(u, i, j);
         }
         if l <= i && j <= r {
             return Some(self.nodes[u].clone());
@@ -112,31 +115,31 @@ mod tests {
     use crate::{default::Min, nodes::Node};
 
     use super::LazySegmentTree;
-
+    // TODO Add more tests
     #[test]
     fn non_empty_query_returns_some() {
-        let nodes: Vec<Min<usize>> = (0..10).map(Min::initialize).collect();
+        let nodes: Vec<Min<usize>> = (0..10).map(|x| Min::initialize(&x)).collect();
         let mut segment_tree = LazySegmentTree::build(&nodes);
         assert!(segment_tree.query(0, 9).is_some());
     }
     #[test]
     fn empty_query_returns_none() {
-        let nodes: Vec<Min<usize>> = (0..10).map(Min::initialize).collect();
+        let nodes: Vec<Min<usize>> = (0..10).map(|x| Min::initialize(&x)).collect();
         let mut segment_tree = LazySegmentTree::build(&nodes);
         assert!(segment_tree.query(10, 0).is_none());
     }
     #[test]
     fn update_works() {
-        let nodes: Vec<Min<usize>> = (0..10).map(Min::initialize).collect();
+        let nodes: Vec<Min<usize>> = (0..10).map(|x| Min::initialize(&x)).collect();
         let mut segment_tree = LazySegmentTree::build(&nodes);
         let value = 20;
         segment_tree.update(0, 9, value);
-        assert_eq!(segment_tree.query(0, 1).unwrap().values(), value);
+        assert_eq!(segment_tree.query(0, 1).unwrap().values(), &value);
     }
     #[test]
     fn query_works() {
-        let nodes: Vec<Min<usize>> = (0..10).map(Min::initialize).collect();
+        let nodes: Vec<Min<usize>> = (0..10).map(|x| Min::initialize(&x)).collect();
         let mut segment_tree = LazySegmentTree::build(&nodes);
-        assert_eq!(segment_tree.query(1, 9).unwrap().values(), 1);
+        assert_eq!(segment_tree.query(1, 9).unwrap().values(), &1);
     }
 }
