@@ -20,17 +20,17 @@ impl<T: LazyNode + Clone> LazySegmentTree<T> {
         out
     }
 
-    fn build_helper(&mut self, u: usize, i: usize, j: usize, values: &[T]) {
+    fn build_helper(&mut self, curr_node: usize, i: usize, j: usize, values: &[T]) {
         if i == j {
-            self.nodes[u] = values[i].clone();
+            self.nodes[curr_node] = values[i].clone();
             return;
         }
-        let m = (i + j) / 2;
-        let l = 2 * u + 1;
-        let r = 2 * u + 2;
-        self.build_helper(l, i, m, values);
-        self.build_helper(r, m + 1, j, values);
-        self.nodes[u] = T::combine(&self.nodes[l], &self.nodes[r]);
+        let mid = (i + j) / 2;
+        let left_node = 2 * curr_node + 1;
+        let right_node = 2 * curr_node + 2;
+        self.build_helper(left_node, i, mid, values);
+        self.build_helper(right_node, mid + 1, j, values);
+        self.nodes[curr_node] = T::combine(&self.nodes[left_node], &self.nodes[right_node]);
     }
 
     fn push(&mut self, u: usize, i: usize, j: usize) {
@@ -51,32 +51,34 @@ impl<T: LazyNode + Clone> LazySegmentTree<T> {
         self.update_helper(i, j, &value, 0, 0, self.n - 1);
     }
 
+
+    // Updates subrange [i,j] of range [l,r] with value 
     fn update_helper(
         &mut self,
         l: usize,
         r: usize,
         value: &<T as Node>::Value,
-        u: usize,
+        curr_node: usize,
         i: usize,
         j: usize,
     ) {
-        if self.nodes[u].lazy_value().is_some() {
-            self.push(u, i, j);
+        if self.nodes[curr_node].lazy_value().is_some() {
+            self.push(curr_node, i, j);
         }
         if j < l || r < i {
             return;
         }
         if l <= i && j <= r {
-            self.nodes[u].update_lazy_value(value);
-            self.push(u, i, j);
+            self.nodes[curr_node].update_lazy_value(value);
+            self.push(curr_node, i, j);
             return;
         }
-        let m = (i + j) / 2;
-        let left = 2 * u + 1;
-        let right = 2 * u + 2;
-        self.update_helper(l, r, value, left, i, m);
-        self.update_helper(l, r, value, right, m + 1, j);
-        self.nodes[u] = T::combine(&self.nodes[l], &self.nodes[r]);
+        let mid = (i + j) / 2;
+        let left_node = 2 * curr_node + 1;
+        let right_node = 2 * curr_node + 2;
+        self.update_helper(l, r, value, left_node, i, mid);
+        self.update_helper(l, r, value, right_node, mid + 1, j);
+        self.nodes[curr_node] = T::combine(&self.nodes[l], &self.nodes[r]);
     }
 
     /// Returns the result from the range \[l,r\].
@@ -86,25 +88,25 @@ impl<T: LazyNode + Clone> LazySegmentTree<T> {
         self.query_helper(l, r, 0, 0, self.n - 1)
     }
 
-    fn query_helper(&mut self, l: usize, r: usize, u: usize, i: usize, j: usize) -> Option<T> {
+    fn query_helper(&mut self, l: usize, r: usize, curr_node: usize, i: usize, j: usize) -> Option<T> {
         if j < l || r < i {
             return None;
         }
-        let m = (i + j) / 2;
-        let left = 2 * u + 1;
-        let right = 2 * u + 2;
-        if self.nodes[u].lazy_value().is_some() {
-            self.push(u, i, j);
+        let mid = (i + j) / 2;
+        let left_node = 2 * curr_node + 1;
+        let right_node = 2 * curr_node + 2;
+        if self.nodes[curr_node].lazy_value().is_some() {
+            self.push(curr_node, i, j);
         }
         if l <= i && j <= r {
-            return Some(self.nodes[u].clone());
+            return Some(self.nodes[curr_node].clone());
         }
-        let ansl = self.query_helper(l, r, left, i, m);
-        let ansr = self.query_helper(l, r, right, m + 1, r);
-        match (ansl, ansr) {
-            (Some(ansl), Some(ansr)) => Some(T::combine(&ansl, &ansr)),
-            (Some(ansl), None) => Some(ansl),
-            (None, Some(ansr)) => Some(ansr),
+        let ans_left = self.query_helper(l, r, left_node, i, mid);
+        let ans_right = self.query_helper(l, r, right_node, mid + 1, r);
+        match (ans_left, ans_right) {
+            (Some(ans_left), Some(ans_right)) => Some(T::combine(&ans_left, &ans_right)),
+            (Some(ans_left), None) => Some(ans_left),
+            (None, Some(ans_right)) => Some(ans_right),
             (None, None) => None,
         }
     }

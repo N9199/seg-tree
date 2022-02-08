@@ -19,40 +19,40 @@ impl<T: PersistentNode + Clone> PersistentSegmentTree<T> {
     }
 
     fn build_helper(&mut self, values: &[T], i: usize, j: usize) -> usize {
-        let u = self.nodes.len();
-        let m = (i + j) / 2;
+        let curr_node = self.nodes.len();
+        let mid = (i + j) / 2;
         if i == j {
             self.nodes.push(values[i].clone());
-            return u;
+            return curr_node;
         }
-        let l = self.build_helper(values, i, m);
-        let r = self.build_helper(values, m + 1, j);
+        let l = self.build_helper(values, i, mid);
+        let r = self.build_helper(values, mid + 1, j);
         self.nodes.push(T::combine(&self.nodes[l], &self.nodes[r]));
         let last = self.nodes.len() - 1;
         self.nodes[last].set_sons(l, r);
-        u
+        curr_node
     }
 
     pub fn query(&self, t: usize, l: usize, r: usize) -> Option<T> {
-        self.query_helper(self.roots[t], l, l, 0, self.n - 1)
+        self.query_helper(self.roots[t], l, r, 0, self.n - 1)
     }
 
-    fn query_helper(&self, u: usize, l: usize, r: usize, i: usize, j: usize) -> Option<T> {
+    fn query_helper(&self, curr_node: usize, l: usize, r: usize, i: usize, j: usize) -> Option<T> {
         if j < l || r < i {
             return None;
         }
         if l <= i && j <= r {
-            return Some(self.nodes[u].clone());
+            return Some(self.nodes[curr_node].clone());
         }
-        let m = (i + j) / 2;
-        let left = self.nodes[u].left();
-        let right = self.nodes[u].right();
-        let ansl = self.query_helper(left, l, r, i, m);
-        let ansr = self.query_helper(right, l, r, m + 1, j);
-        match (ansl, ansr) {
-            (Some(ansl), Some(ansr)) => Some(T::combine(&ansl, &ansr)),
-            (Some(ansl), None) => Some(ansl),
-            (None, Some(ansr)) => Some(ansr),
+        let mid = (i + j) / 2;
+        let left_node = self.nodes[curr_node].left();
+        let right_node = self.nodes[curr_node].right();
+        let ans_left = self.query_helper(left_node, l, r, i, mid);
+        let ans_right = self.query_helper(right_node, l, r, mid + 1, j);
+        match (ans_left, ans_right) {
+            (Some(ans_left), Some(ans_right)) => Some(T::combine(&ans_left, &ans_right)),
+            (Some(ans_left), None) => Some(ans_left),
+            (None, Some(ans_right)) => Some(ans_right),
             (None, None) => None,
         }
     }

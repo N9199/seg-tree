@@ -38,13 +38,13 @@ impl<T: Node + Clone> IterativeSegmentTree<T> {
     /// It will **panic** if l or r are not in \[0,n).
     pub fn query(&self, l: usize, r: usize) -> Option<T> {
         let (mut l, mut r) = (l, r);
-        let mut ansl: Option<T> = None;
-        let mut ansr: Option<T> = None;
+        let mut ans_left: Option<T> = None;
+        let mut ans_right: Option<T> = None;
         l += self.n;
         r += self.n+1;
         while l < r {
             if l & 1 != 0 {
-                ansl = Some(match ansl {
+                ans_left = Some(match ans_left {
                     None => T::initialize(self.nodes[l].values()),
                     Some(node) => T::combine(&node, &self.nodes[l]),
                 });
@@ -52,7 +52,7 @@ impl<T: Node + Clone> IterativeSegmentTree<T> {
             }
             if r & 1 != 0 {
                 r -= 1;
-                ansr = Some(match ansr {
+                ans_right = Some(match ans_right {
                     None => T::initialize(self.nodes[r].values()),
                     Some(node) => T::combine(&self.nodes[r], &node),
                 });
@@ -60,10 +60,10 @@ impl<T: Node + Clone> IterativeSegmentTree<T> {
             l >>= 1;
             r >>= 1;
         }
-        match (ansl, ansr) {
-            (Some(ansl), Some(ansr)) => Some(T::combine(&ansl, &ansr)),
-            (Some(ansl), None) => Some(T::initialize(ansl.values())),
-            (None, Some(ansr)) => Some(T::initialize(ansr.values())),
+        match (ans_left, ans_right) {
+            (Some(ans_left), Some(ans_right)) => Some(T::combine(&ans_left, &ans_right)),
+            (Some(ans_left), None) => Some(T::initialize(ans_left.values())),
+            (None, Some(ans_right)) => Some(T::initialize(ans_right.values())),
             (None, None) => None,
         }
     }
