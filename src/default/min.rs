@@ -26,7 +26,7 @@ where
             lazy_value: None,
         }
     }
-    fn values(&self) -> &Self::Value {
+    fn value(&self) -> &Self::Value {
         &self.value
     }
 }

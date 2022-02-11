@@ -30,7 +30,7 @@ impl Node for MaxSubarraySum {
             sum: a.sum + b.sum,
         }
     }
-    fn values(&self) -> &Self::Value {
+    fn value(&self) -> &Self::Value {
         &self.max_sum
     }
 }

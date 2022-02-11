@@ -23,13 +23,13 @@ impl<T: Node + Clone> IterativeSegmentTree<T> {
 
     /// Sets the i-th element of the segment tree to value T and update the segment tree correspondingly.
     /// It will panic if i is not in \[0,n)
-    pub fn set(&mut self, i: usize, value: T) {
+    pub fn update(&mut self, i: usize, value: <T as Node>::Value) {
         let mut i = i;
         i += self.n;
-        self.nodes[i] = value;
+        self.nodes[i] = Node::initialize(&value);
         while i > 0 {
             i >>= 1;
-            self.nodes[i] = T::combine(&self.nodes[2 * i], &self.nodes[2 * i + 1]);
+            self.nodes[i] = Node::combine(&self.nodes[2 * i], &self.nodes[2 * i + 1]);
         }
     }
 
@@ -45,7 +45,7 @@ impl<T: Node + Clone> IterativeSegmentTree<T> {
         while l < r {
             if l & 1 != 0 {
                 ans_left = Some(match ans_left {
-                    None => T::initialize(self.nodes[l].values()),
+                    None => T::initialize(self.nodes[l].value()),
                     Some(node) => T::combine(&node, &self.nodes[l]),
                 });
                 l += 1;
@@ -53,7 +53,7 @@ impl<T: Node + Clone> IterativeSegmentTree<T> {
             if r & 1 != 0 {
                 r -= 1;
                 ans_right = Some(match ans_right {
-                    None => T::initialize(self.nodes[r].values()),
+                    None => T::initialize(self.nodes[r].value()),
                     Some(node) => T::combine(&self.nodes[r], &node),
                 });
             }
@@ -62,8 +62,8 @@ impl<T: Node + Clone> IterativeSegmentTree<T> {
         }
         match (ans_left, ans_right) {
             (Some(ans_left), Some(ans_right)) => Some(T::combine(&ans_left, &ans_right)),
-            (Some(ans_left), None) => Some(T::initialize(ans_left.values())),
-            (None, Some(ans_right)) => Some(T::initialize(ans_right.values())),
+            (Some(ans_left), None) => Some(T::initialize(ans_left.value())),
+            (None, Some(ans_right)) => Some(T::initialize(ans_right.value())),
             (None, None) => None,
         }
     }
@@ -88,17 +88,17 @@ mod tests {
         assert!(segment_tree.query(10, 0).is_none());
     }
     #[test]
-    fn set_works() {
+    fn update_works() {
         let nodes: Vec<Min<usize>> = (0..=10).map(|x|Min::initialize(&x)).collect();
         let mut segment_tree = IterativeSegmentTree::build(&nodes);
         let value = 20;
-        segment_tree.set(0, Min::initialize(&value));
-        assert_eq!(segment_tree.query(0, 0).unwrap().values(), &value);
+        segment_tree.update(0, value);
+        assert_eq!(segment_tree.query(0, 0).unwrap().value(), &value);
     }
     #[test]
     fn query_works() {
         let nodes: Vec<Min<usize>> = (0..=10).map(|x|Min::initialize(&x)).collect();
         let segment_tree = IterativeSegmentTree::build(&nodes);
-        assert_eq!(segment_tree.query(1, 10).unwrap().values(), &1);
+        assert_eq!(segment_tree.query(1, 10).unwrap().value(), &1);
     }
 }

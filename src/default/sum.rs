@@ -1,14 +1,16 @@
 use std::ops::{Add, Mul};
 
-use crate::nodes::{LazyNode, Node};
+use crate::nodes::{LazyNode, Node, PersistentNode};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Sum<T>
 where
     T: Add<Output = T> + Clone,
 {
     value: T,
     lazy_value: Option<T>,
+    left: usize,
+    right: usize,
 }
 
 impl<T> Node for Sum<T>
@@ -20,15 +22,19 @@ where
         Sum {
             value: v.clone(),
             lazy_value: None,
+            left: 0,
+            right: 0,
         }
     }
     fn combine(a: &Self, b: &Self) -> Self {
         Sum {
             value: a.value.clone() + b.value.clone(),
             lazy_value: None,
+            left: 0,
+            right: 0,
         }
     }
-    fn values(&self) -> &Self::Value {
+    fn value(&self) -> &Self::Value {
         &self.value
     }
 }
@@ -61,10 +67,32 @@ where
     }
 }
 
+impl<T> PersistentNode for Sum<T>
+where
+    T: Add<Output = T> + Clone,
+{
+    fn left(&self) -> usize {
+        self.left
+    }
+
+    fn right(&self) -> usize {
+        self.right
+    }
+
+    fn set_sons(&mut self, left: usize, right: usize) {
+        self.left = left;
+        self.right = right;
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use std::ops::{Add, Mul};
 
-    use crate::{default::Sum, nodes::{Node, LazyNode}};
+    use crate::{
+        default::Sum,
+        nodes::{LazyNode, Node},
+    };
 
     #[derive(Clone, Copy, Debug, PartialEq)]
     struct NonCommutativeTest(u64);
@@ -91,21 +119,25 @@ mod tests {
         let result = nodes
             .iter()
             .fold(Sum::initialize(&0), |acc, new| Sum::combine(&acc, new));
-        assert_eq!(result.values(), &500000500000);
+        assert_eq!(result.value(), &500000500000);
     }
     #[test]
     fn non_commutative_sum_works() {
-        let nodes: Vec<Sum<NonCommutativeTest>> = (0..=1000000).map(|x| Sum::initialize(&NonCommutativeTest(x))).collect();
+        let nodes: Vec<Sum<NonCommutativeTest>> = (0..=1000000)
+            .map(|x| Sum::initialize(&NonCommutativeTest(x)))
+            .collect();
         let result = nodes
             .iter()
-            .fold(Sum::initialize(&NonCommutativeTest(0)), |acc, new| Sum::combine(&acc, new));
-        assert_eq!(result.values(), &NonCommutativeTest(1000000));
+            .fold(Sum::initialize(&NonCommutativeTest(0)), |acc, new| {
+                Sum::combine(&acc, new)
+            });
+        assert_eq!(result.value(), &NonCommutativeTest(1000000));
     }
     #[test]
     fn update_lazy_value_works() {
         let mut node = Sum::initialize(&1);
         node.update_lazy_value(&2);
-        assert_eq!(node.lazy_value(),Some(&2));
+        assert_eq!(node.lazy_value(), Some(&2));
     }
 
     #[test]
@@ -114,14 +146,14 @@ mod tests {
         let mut node = Sum::initialize(&1);
         node.update_lazy_value(&2);
         node.lazy_update(0, 10);
-        assert_eq!(node.values(),&23);
+        assert_eq!(node.value(), &23);
     }
 
     #[test]
     fn non_commutative_update_lazy_value_works() {
         let mut node = Sum::initialize(&NonCommutativeTest(1));
         node.update_lazy_value(&NonCommutativeTest(2));
-        assert_eq!(node.lazy_value(),Some(&NonCommutativeTest(2)));
+        assert_eq!(node.lazy_value(), Some(&NonCommutativeTest(2)));
     }
     #[test]
     fn non_commutative_lazy_update_works() {
@@ -129,6 +161,6 @@ mod tests {
         let mut node = Sum::initialize(&NonCommutativeTest(1));
         node.update_lazy_value(&NonCommutativeTest(2));
         node.lazy_update(0, 10);
-        assert_eq!(node.values(),&NonCommutativeTest(2));
+        assert_eq!(node.value(), &NonCommutativeTest(2));
     }
 }
