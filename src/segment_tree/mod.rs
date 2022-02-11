@@ -1,6 +1,6 @@
 mod iterative;
 mod lazy;
 mod persistent;
-pub mod persistent_lazy;
+mod persistent_lazy;
 
-pub use self::{iterative::IterativeSegmentTree, lazy::LazySegmentTree, persistent::PersistentSegmentTree};
+pub use self::{iterative::IterativeSegmentTree, lazy::LazySegmentTree, persistent::PersistentSegmentTree, persistent_lazy::LazyPersistentSegmentTree};
