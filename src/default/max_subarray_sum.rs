@@ -1,18 +1,20 @@
 use crate::nodes::Node;
 
+
+/// Implementation of the solution to the maximum subarray problem. It just implements [Node].
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct MaxSubarraySum {
+pub struct MaxSubArraySum {
     max_sum: i64,
     max_prefix_sum: i64,
     max_suffix_sum: i64,
     sum: i64,
 }
 
-impl Node for MaxSubarraySum {
+impl Node for MaxSubArraySum {
     type Value = i64;
     fn initialize(value: &Self::Value) -> Self {
         let v = value.to_owned();
-        MaxSubarraySum {
+        MaxSubArraySum {
             max_sum: v,
             max_prefix_sum: v,
             max_suffix_sum: v,
@@ -20,7 +22,7 @@ impl Node for MaxSubarraySum {
         }
     }
     fn combine(a: &Self, b: &Self) -> Self {
-        MaxSubarraySum {
+        MaxSubArraySum {
             max_sum: a
                 .max_sum
                 .max(b.max_sum)

@@ -1,12 +1,13 @@
 use crate::nodes::{LazyNode, Node};
 
+/// Implementation of lazy segment tree with range queries and range updates.
 pub struct LazySegmentTree<T: LazyNode> {
     nodes: Vec<T>,
     n: usize,
 }
 
 impl<T: LazyNode + Clone> LazySegmentTree<T> {
-    /// Builds Lazy Segment Tree from slice.
+    /// Builds lazy segment tree from slice, each element of the slice will correspond to a leaf of the segment tree.
     pub fn build(values: &[T]) -> Self {
         let n = values.len();
         let mut nodes = Vec::with_capacity(4 * n);
@@ -51,7 +52,6 @@ impl<T: LazyNode + Clone> LazySegmentTree<T> {
         self.update_helper(i, j, &value, 0, 0, self.n - 1);
     }
 
-    // Updates subrange [i,j] of range [l,r] with value
     fn update_helper(
         &mut self,
         left: usize,
@@ -80,22 +80,22 @@ impl<T: LazyNode + Clone> LazySegmentTree<T> {
         self.nodes[curr_node] = T::combine(&self.nodes[left], &self.nodes[right]);
     }
 
-    /// Returns the result from the range \[l,r\].
+    /// Returns the result from the range \[left,right\].
     /// It returns None if and only if range is empty.
-    /// It will **panic** if l or r are not in [0,n).
-    pub fn query(&mut self, l: usize, r: usize) -> Option<T> {
-        self.query_helper(l, r, 0, 0, self.n - 1)
+    /// It will **panic** if left or right are not in [0,n).
+    pub fn query(&mut self, left: usize, right: usize) -> Option<T> {
+        self.query_helper(left, right, 0, 0, self.n - 1)
     }
 
     fn query_helper(
         &mut self,
-        l: usize,
-        r: usize,
+        left: usize,
+        right: usize,
         curr_node: usize,
         i: usize,
         j: usize,
     ) -> Option<T> {
-        if j < l || r < i {
+        if j < left || right < i {
             return None;
         }
         let mid = (i + j) / 2;
@@ -104,12 +104,12 @@ impl<T: LazyNode + Clone> LazySegmentTree<T> {
         if self.nodes[curr_node].lazy_value().is_some() {
             self.push(curr_node, i, j);
         }
-        if l <= i && j <= r {
+        if left <= i && j <= right {
             return Some(self.nodes[curr_node].clone());
         }
         match (
-            self.query_helper(l, r, left_node, i, mid),
-            self.query_helper(l, r, right_node, mid + 1, r),
+            self.query_helper(left, right, left_node, i, mid),
+            self.query_helper(left, right, right_node, mid + 1, right),
         ) {
             (Some(ans_left), Some(ans_right)) => Some(T::combine(&ans_left, &ans_right)),
             (Some(ans_left), None) => Some(ans_left),

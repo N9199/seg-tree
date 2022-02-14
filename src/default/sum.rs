@@ -2,6 +2,7 @@ use std::ops::{Add, Mul};
 
 use crate::nodes::{LazyNode, Node, PersistentNode};
 
+/// Implementation of range sum for generic type T, it implements [Node], [LazyNode] and [PersistentNode], as such it can be used as a node in every segment tree type.
 #[derive(Clone, Debug)]
 pub struct Sum<T>
 where
@@ -18,6 +19,7 @@ where
     T: Add<Output = T> + Clone,
 {
     type Value = T;
+    /// The node is initialized with the value given.
     fn initialize(v: &Self::Value) -> Self {
         Sum {
             value: v.clone(),
@@ -26,6 +28,7 @@ where
             right: 0,
         }
     }
+    /// As this is a range sum node, the operation which is used to 'merge' two nodes is `+`.
     fn combine(a: &Self, b: &Self) -> Self {
         Sum {
             value: a.value.clone() + b.value.clone(),
@@ -39,14 +42,13 @@ where
     }
 }
 
+/// Implementation for sum range query node, the update adds the value to each item in the range.
+/// It assumes that `a*n`, where a: T and n: usize is well defined and `a*n = a+...+a` with 'n' a.
+/// For non-commutative operations, two things will be true `lazy_value = lazy_value + new_value`.
 impl<T> LazyNode for Sum<T>
 where
     T: Add<Output = T> + Mul<usize, Output = T> + Clone,
 {
-    /// Implementation for sum range query node, the update adds the value to each item in the range.
-    /// It assumes that a*n, where a: T and n: usize is well defined and a*n = a+...+a with 'n' a.
-    /// For non-commutative operations, two things will be true lazy_value = lazy_value + new_value
-
     fn lazy_update(&mut self, i: usize, j: usize) {
         if let Some(value) = self.lazy_value.take() {
             let temp = self.value.clone() + value * (j - i + 1);
@@ -66,20 +68,20 @@ where
         self.lazy_value.as_ref()
     }
 }
-
+/// This is a pretty generic implementation of [PersistentNode] for a struct.
 impl<T> PersistentNode for Sum<T>
 where
     T: Add<Output = T> + Clone,
 {
-    fn left(&self) -> usize {
+    fn left_child(&self) -> usize {
         self.left
     }
 
-    fn right(&self) -> usize {
+    fn right_child(&self) -> usize {
         self.right
     }
 
-    fn set_sons(&mut self, left: usize, right: usize) {
+    fn set_children(&mut self, left: usize, right: usize) {
         self.left = left;
         self.right = right;
     }

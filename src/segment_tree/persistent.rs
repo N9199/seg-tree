@@ -1,5 +1,6 @@
 use crate::nodes::{Node, PersistentNode};
 
+/// Implementation of persistent segment trees, it saves every version of itself, it has range queries and point updates.
 pub struct PersistentSegmentTree<T: PersistentNode> {
     nodes: Vec<T>,
     roots: Vec<usize>,
@@ -10,6 +11,7 @@ impl<T> PersistentSegmentTree<T>
 where
     T: PersistentNode + Clone,
 {
+    /// Builds persistent segment tree from slice, each element of the slice will correspond to a leaf of the segment tree.
     pub fn build(values: &[T]) -> Self {
         let n = values.len();
         let mut temp = Self {
@@ -34,10 +36,13 @@ where
         let curr_node = self.nodes.len();
         self.nodes
             .push(T::combine(&self.nodes[left_node], &self.nodes[right_node]));
-        self.nodes[curr_node].set_sons(left_node, right_node);
+        self.nodes[curr_node].set_children(left_node, right_node);
         curr_node
     }
 
+    /// Returns the result from the range \[left,right\] from the version of the segment tree.
+    /// It returns None if and only if range is empty.
+    /// It will **panic** if left or right are not in [0,n), or if version is not in [0,[versions](PersistentSegmentTree::versions)).
     pub fn query(&self, version: usize, left: usize, right: usize) -> Option<T> {
         self.query_helper(self.roots[version], left, right, 0, self.n - 1)
     }
@@ -57,8 +62,8 @@ where
             return Some(self.nodes[curr_node].clone());
         }
         let mid = (i + j) / 2;
-        let left_node = self.nodes[curr_node].left();
-        let right_node = self.nodes[curr_node].right();
+        let left_node = self.nodes[curr_node].left_child();
+        let right_node = self.nodes[curr_node].right_child();
         match (
             self.query_helper(left_node, left, right, i, mid),
             self.query_helper(right_node, left, right, mid + 1, j),
@@ -70,6 +75,8 @@ where
         }
     }
 
+    /// Creates a new segment tree version from version were the p-th element of the segment tree to value T and update the segment tree correspondingly.
+    /// It will panic if p is not in \[0,n), or if version is not in [0,[versions](PersistentSegmentTree::versions)).
     pub fn update(&mut self, version: usize, p: usize, value: <T as Node>::Value) {
         let new_root = self.update_helper(self.roots[version], p, &value, 0, self.n - 1);
         self.roots.push(new_root);
@@ -93,11 +100,15 @@ where
             return x;
         }
         let mid = (i + j) / 2;
-        let left_node = self.update_helper(self.nodes[x].left(), p, value, i, mid);
-        let right_node = self.update_helper(self.nodes[x].right(), p, value, mid + 1, j);
+        let left_node = self.update_helper(self.nodes[x].left_child(), p, value, i, mid);
+        let right_node = self.update_helper(self.nodes[x].right_child(), p, value, mid + 1, j);
         self.nodes[x] = Node::combine(&self.nodes[left_node], &self.nodes[right_node]);
-        self.nodes[x].set_sons(left_node, right_node);
+        self.nodes[x].set_children(left_node, right_node);
         x
+    }
+    /// Return the amount of different versions the current segment tree has.
+    pub fn versions(&self) -> usize {
+        self.roots.len()
     }
 }
 #[cfg(test)]

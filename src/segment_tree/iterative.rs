@@ -1,12 +1,13 @@
 use crate::nodes::Node;
 
-pub struct IterativeSegmentTree<T: Node> {
+/// Implementation of simple segment tree with range queries and point updates.
+pub struct SegmentTree<T: Node> {
     nodes: Vec<T>,
     n: usize,
 }
 
-impl<T: Node + Clone> IterativeSegmentTree<T> {
-    /// Builds Iterative Segment Tree from slice.
+impl<T: Node + Clone> SegmentTree<T> {
+    /// Builds segment tree from slice, each element of the slice will correspond to a leaf of the segment tree.
     pub fn build(values: &[T]) -> Self {
         let n = values.len();
         let mut nodes = Vec::with_capacity(2 * n);
@@ -33,9 +34,9 @@ impl<T: Node + Clone> IterativeSegmentTree<T> {
         }
     }
 
-    /// Returns the result from the range \[l,r\].
+    /// Returns the result from the range \[left,right\].
     /// It returns None if and only if range is empty.
-    /// It will **panic** if l or r are not in \[0,n).
+    /// It will **panic** if left or right are not in \[0,n).
     pub fn query(&self, l: usize, r: usize) -> Option<T> {
         let (mut l, mut r) = (l, r);
         let mut ans_left: Option<T> = None;
@@ -46,7 +47,7 @@ impl<T: Node + Clone> IterativeSegmentTree<T> {
             if l & 1 != 0 {
                 ans_left = Some(match ans_left {
                     None => T::initialize(self.nodes[l].value()),
-                    Some(node) => T::combine(&node, &self.nodes[l]),
+                    Some(node) => Node::combine(&node, &self.nodes[l]),
                 });
                 l += 1;
             }
@@ -54,16 +55,16 @@ impl<T: Node + Clone> IterativeSegmentTree<T> {
                 r -= 1;
                 ans_right = Some(match ans_right {
                     None => T::initialize(self.nodes[r].value()),
-                    Some(node) => T::combine(&self.nodes[r], &node),
+                    Some(node) => Node::combine(&self.nodes[r], &node),
                 });
             }
             l >>= 1;
             r >>= 1;
         }
         match (ans_left, ans_right) {
-            (Some(ans_left), Some(ans_right)) => Some(T::combine(&ans_left, &ans_right)),
-            (Some(ans_left), None) => Some(T::initialize(ans_left.value())),
-            (None, Some(ans_right)) => Some(T::initialize(ans_right.value())),
+            (Some(ans_left), Some(ans_right)) => Some(Node::combine(&ans_left, &ans_right)),
+            (Some(ans_left), None) => Some(Node::initialize(ans_left.value())),
+            (None, Some(ans_right)) => Some(Node::initialize(ans_right.value())),
             (None, None) => None,
         }
     }
@@ -73,24 +74,24 @@ impl<T: Node + Clone> IterativeSegmentTree<T> {
 mod tests {
     use crate::{default::Min, nodes::Node};
 
-    use super::IterativeSegmentTree;
+    use super::SegmentTree;
 
     #[test]
     fn non_empty_query_returns_some() {
         let nodes: Vec<Min<usize>> = (0..=10).map(|x|Min::initialize(&x)).collect();
-        let segment_tree = IterativeSegmentTree::build(&nodes);
+        let segment_tree = SegmentTree::build(&nodes);
         assert!(segment_tree.query(0, 10).is_some());
     }
     #[test]
     fn empty_query_returns_none() {
         let nodes: Vec<Min<usize>> = (0..=10).map(|x|Min::initialize(&x)).collect();
-        let segment_tree = IterativeSegmentTree::build(&nodes);
+        let segment_tree = SegmentTree::build(&nodes);
         assert!(segment_tree.query(10, 0).is_none());
     }
     #[test]
     fn update_works() {
         let nodes: Vec<Min<usize>> = (0..=10).map(|x|Min::initialize(&x)).collect();
-        let mut segment_tree = IterativeSegmentTree::build(&nodes);
+        let mut segment_tree = SegmentTree::build(&nodes);
         let value = 20;
         segment_tree.update(0, value);
         assert_eq!(segment_tree.query(0, 0).unwrap().value(), &value);
@@ -98,7 +99,7 @@ mod tests {
     #[test]
     fn query_works() {
         let nodes: Vec<Min<usize>> = (0..=10).map(|x|Min::initialize(&x)).collect();
-        let segment_tree = IterativeSegmentTree::build(&nodes);
+        let segment_tree = SegmentTree::build(&nodes);
         assert_eq!(segment_tree.query(1, 10).unwrap().value(), &1);
     }
 }
