@@ -10,9 +10,9 @@
 
 
 #![warn(missing_docs)]
-/// Module which provides already implemented nodes.
+/// Provided node implementations.
 pub mod default;
-/// Module which provides every node trait.
+/// Node traits.
 pub mod nodes;
-/// Module which provides segment tree implementation
+/// Segment trees.
 pub mod segment_tree;

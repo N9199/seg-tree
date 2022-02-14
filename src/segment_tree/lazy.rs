@@ -1,6 +1,7 @@
 use crate::nodes::{LazyNode, Node};
 
-/// Implementation of lazy segment tree with range queries and range updates.
+/// Lazy segment tree with range queries and range updates.
+/// It uses `O(n)` space, assuming that each node uses `O(1)` space.
 pub struct LazySegmentTree<T: LazyNode> {
     nodes: Vec<T>,
     n: usize,
@@ -8,6 +9,7 @@ pub struct LazySegmentTree<T: LazyNode> {
 
 impl<T: LazyNode + Clone> LazySegmentTree<T> {
     /// Builds lazy segment tree from slice, each element of the slice will correspond to a leaf of the segment tree.
+    /// It has time complexity of `O(n*log(n))`, assuming that [combine](Node::combine) has constant time complexity.
     pub fn build(values: &[T]) -> Self {
         let n = values.len();
         let mut nodes = Vec::with_capacity(4 * n);
@@ -47,7 +49,8 @@ impl<T: LazyNode + Clone> LazySegmentTree<T> {
     }
 
     /// Updates the range \[i,j\] with value.
-    /// It will panic if i or j is not in \[0,n)
+    /// It will panic if i or j is not in \[0,n).
+    /// It has time complexity of `O(log(n))`, assuming that [combine](Node::combine), [update_lazy_value](LazyNode::update_lazy_value) and [update_lazy_value](LazyNode::lazy_update) have constant time complexity.
     pub fn update(&mut self, i: usize, j: usize, value: <T as Node>::Value) {
         self.update_helper(i, j, &value, 0, 0, self.n - 1);
     }
@@ -83,6 +86,7 @@ impl<T: LazyNode + Clone> LazySegmentTree<T> {
     /// Returns the result from the range \[left,right\].
     /// It returns None if and only if range is empty.
     /// It will **panic** if left or right are not in [0,n).
+    /// It has time complexity of `O(log(n))`, assuming that [combine](Node::combine), [update_lazy_value](LazyNode::update_lazy_value) and [update_lazy_value](LazyNode::lazy_update) have constant time complexity.
     pub fn query(&mut self, left: usize, right: usize) -> Option<T> {
         self.query_helper(left, right, 0, 0, self.n - 1)
     }

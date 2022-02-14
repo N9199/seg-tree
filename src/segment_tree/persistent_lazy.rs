@@ -1,7 +1,8 @@
 use crate::nodes::{LazyNode, Node, PersistentNode};
 
 
-/// Implementation of lazy persistent segment trees, it saves every version of itself, it has range queries and range updates.
+/// Lazy persistent segment tree, it saves every version of itself, it has range queries and range updates.
+/// It uses `O(n+q*log(n))` space, where `q` is the amount of updates, and assuming that each node uses `O(1)` space.
 pub struct LazyPersistentSegmentTree<T: PersistentNode + LazyNode> {
     nodes: Vec<T>,
     roots: Vec<usize>,
@@ -13,11 +14,12 @@ where
     T: PersistentNode + LazyNode + Clone, // + std::fmt::Debug,
 {
     /// Builds a lazy persistent segment tree from slice, each element of the slice will correspond to a leaf of the segment tree.
+    /// It has time complexity of `O(n*log(n))`, assuming that [combine](Node::combine) has constant time complexity.
     pub fn build(values: &[T]) -> Self {
         let n = values.len();
         let mut temp = Self {
-            nodes: Vec::new(),
-            roots: Vec::new(),
+            nodes: Vec::with_capacity(4*n),
+            roots: Vec::with_capacity(1),
             n,
         };
         let root = temp.build_helper(values, 0, n - 1);
@@ -44,6 +46,7 @@ where
     /// Returns the result from the range \[left,right\] from the version of the segment tree.
     /// It returns None if and only if range is empty.
     /// It will **panic** if left or right are not in [0,n), or if version is not in [0,[versions](LazyPersistentSegmentTree::versions)).
+    /// It has time complexity of `O(log(n))`, assuming that [combine](Node::combine), [update_lazy_value](LazyNode::update_lazy_value) and [update_lazy_value](LazyNode::lazy_update) have constant time complexity.
     pub fn query(&mut self, version: usize, left: usize, right: usize) -> Option<T> {
         self.query_helper(self.roots[version], left, right, 0, self.n - 1)
     }
@@ -97,6 +100,7 @@ where
 
     // Creates a new segment tree version from version were the p-th element of the segment tree to value T and update the segment tree correspondingly.
     /// It will panic if p is not in \[0,n), or if version is not in [0,[versions](LazyPersistentSegmentTree::versions)).
+    /// It has time complexity of `O(log(n))`, assuming that [combine](Node::combine), [update_lazy_value](LazyNode::update_lazy_value) and [update_lazy_value](LazyNode::lazy_update) have constant time complexity.
     pub fn update(&mut self, version: usize, left: usize, right: usize, value: <T as Node>::Value) {
         let new_root = self.update_helper(self.roots[version], left, right, &value, 0, self.n - 1);
         self.roots.push(new_root);
