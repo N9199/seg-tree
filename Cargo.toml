@@ -5,6 +5,7 @@ edition = "2021"
 authors = ["N9199 <N9199@users.noreply.github.com>"]
 repository = "https://github.com/N9199/seg-tree"
 readme = "README.md"
+license = "AGPL-3.0-or-later"
 
 [dependencies]
 seg-tree-macros = {version = "0.1.0", path = "seg-tree-macros"}
