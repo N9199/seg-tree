@@ -9,4 +9,4 @@ description = "A simple segment tree library"
 license = "AGPL-3.0-or-later"
 
 [dependencies]
-seg-tree-macros = {version = "0.1.0", path = "seg-tree-macros"}
+# seg-tree-macros = {version = "0.1.0", path = "seg-tree-macros"}
