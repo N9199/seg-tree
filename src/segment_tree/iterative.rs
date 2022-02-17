@@ -7,7 +7,10 @@ pub struct SegmentTree<T: Node + Clone> {
     n: usize,
 }
 
-impl<T: Node + Clone> SegmentTree<T> {
+impl<T> SegmentTree<T>
+where
+    T: Node + Clone,
+{
     /// Builds segment tree from slice, each element of the slice will correspond to a leaf of the segment tree.
     /// It has time complexity of `O(n*log(n))`, assuming that [combine](Node::combine) has constant time complexity.
     pub fn build(values: &[T]) -> Self {
@@ -43,14 +46,14 @@ impl<T: Node + Clone> SegmentTree<T> {
     /// It has time complexity of `O(log(n))`, assuming that [combine](Node::combine) has constant time complexity.
     pub fn query(&self, l: usize, r: usize) -> Option<T> {
         let (mut l, mut r) = (l, r);
-        let mut ans_left: Option<T> = None;
-        let mut ans_right: Option<T> = None;
+        let mut ans_left = None;
+        let mut ans_right = None;
         l += self.n;
         r += self.n + 1;
         while l < r {
             if l & 1 != 0 {
                 ans_left = Some(match ans_left {
-                    None => T::initialize(self.nodes[l].value()),
+                    None => Node::initialize(self.nodes[l].value()),
                     Some(node) => Node::combine(&node, &self.nodes[l]),
                 });
                 l += 1;
@@ -58,7 +61,7 @@ impl<T: Node + Clone> SegmentTree<T> {
             if r & 1 != 0 {
                 r -= 1;
                 ans_right = Some(match ans_right {
-                    None => T::initialize(self.nodes[r].value()),
+                    None => Node::initialize(self.nodes[r].value()),
                     Some(node) => Node::combine(&self.nodes[r], &node),
                 });
             }
@@ -73,7 +76,6 @@ impl<T: Node + Clone> SegmentTree<T> {
         }
     }
 }
-
 #[cfg(test)]
 mod tests {
     use crate::{default::Min, nodes::Node};

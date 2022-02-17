@@ -1,12 +1,15 @@
 [package]
 name = "seg-tree"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["N9199 <N9199@users.noreply.github.com>"]
+documentation = "https://docs.rs/seg-tree"
 repository = "https://github.com/N9199/seg-tree"
 readme = "README.md"
 description = "A simple segment tree library"
 license = "AGPL-3.0-or-later"
-
+exclude = [
+    ".github/"
+]
 [dependencies]
 # seg-tree-macros = {version = "0.1.0", path = "seg-tree-macros"}
