@@ -42,7 +42,7 @@ where
         curr_node
     }
 
-    /// Returns the result from the range \[left,right\] from the version of the segment tree.
+    /// Returns the result from the range `[left,right]` from the version of the segment tree.
     /// It returns None if and only if range is empty.
     /// It will **panic** if left or right are not in [0,n), or if version is not in [0,[versions](PersistentSegmentTree::versions)).
     /// It has time complexity of `O(log(n))`, assuming that [combine](Node::combine) has constant time complexity.
@@ -79,7 +79,7 @@ where
     }
 
     /// Creates a new segment tree version from version were the p-th element of the segment tree to value T and update the segment tree correspondingly.
-    /// It will panic if p is not in \[0,n), or if version is not in [0,[versions](PersistentSegmentTree::versions)).
+    /// It will panic if p is not in `[0,n)`, or if version is not in [0,[versions](PersistentSegmentTree::versions)).
     /// It has time complexity of `O(log(n))`, assuming that [combine](Node::combine) has constant time complexity.
     pub fn update(&mut self, version: usize, p: usize, value: <T as Node>::Value) {
         let new_root = self.update_helper(self.roots[version], p, &value, 0, self.n - 1);
@@ -113,6 +113,72 @@ where
     /// Return the amount of different versions the current segment tree has.
     pub fn versions(&self) -> usize {
         self.roots.len()
+    }
+
+    /// A method that finds the smallest prefix[^note] `u` such that `predicate(u.value(), value)` is `true`. The following must be true:
+    /// - `predicate` is monotonic over prefixes[^note2].
+    /// - `g` will satisfy the following, given segments `[i,j]` and `[i,k]` with `j<k` we have that `predicate([i,k].value(),value)` implies `predicate([j+1,k].value(),g([i,j].value(),value))`.
+    /// 
+    /// These are two examples, the first is finding the smallest prefix which sums at least some value.
+    /// ```
+    /// # use seg_tree::{segment_tree::PersistentSegmentTree,default::Sum,nodes::Node};
+    /// let predicate = |left_value:&usize, value:&usize|{*left_value>=*value}; // Is the sum greater or equal to value?
+    /// let g = |left_node:&usize,value:usize|{value-*left_node}; // Subtract the sum of the prefix.
+    /// # let nodes: Vec<Sum<usize>> = (0..10).map(|x| Sum::initialize(&x)).collect();
+    /// let seg_tree = PersistentSegmentTree::build(&nodes); // [0,1,2,3,4,5,6,7,8,9] with Sum<usize> nodes
+    /// let index = seg_tree.lower_bound(0, predicate, g, 3); // Will return 2 as sum([0,1,2])>=3
+    /// # let sums = vec![0,1,3,6,10,15,21,28,36,45];
+    /// # for i in 0..10{
+    /// #    assert_eq!(seg_tree.lower_bound(0, predicate, g, sums[i]), i);
+    /// # }
+    /// ```
+    /// The second is finding the position of the smallest value greater or equal to some value.
+    /// ```
+    /// # use seg_tree::{segment_tree::PersistentSegmentTree,default::Max,nodes::Node};
+    /// let predicate = |left_value:&usize, value:&usize|{*left_value>=*value}; // Is the maximum greater or equal to value?
+    /// let g = |_left_node:&usize,value:usize|{value}; // Do nothing
+    /// # let nodes: Vec<Max<usize>> = (0..10).map(|x| Max::initialize(&x)).collect();
+    /// let seg_tree = PersistentSegmentTree::build(&nodes); // [0,1,2,3,4,5,6,7,8,9] with Max<usize> nodes
+    /// let index = seg_tree.lower_bound(0, predicate, g, 3); // Will return 3 as 3>=3
+    /// # for i in 0..10{
+    /// #    assert_eq!(seg_tree.lower_bound(0, predicate, g, i), i);
+    /// # }
+    /// ```
+    /// 
+    /// [^note]: A prefix is a segment of the form `[0,i]`.
+    /// 
+    /// [^note2]: Given two prefixes `u` and `v` if `u` is contained in `v` then `predicate(u.value(), value)` implies `predicate(v.value(), value)`.
+    pub fn lower_bound(
+        &self,
+        version: usize,
+        predicate: fn(&<T as Node>::Value, &<T as Node>::Value) -> bool,
+        g: fn(&<T as Node>::Value, <T as Node>::Value) -> <T as Node>::Value,
+        value: <T as Node>::Value,
+    ) -> usize {
+        self.lower_bound_helper(self.roots[version], 0, self.n - 1, predicate, g, value)
+    }
+    fn lower_bound_helper(
+        &self,
+        curr_node: usize,
+        i: usize,
+        j: usize,
+        predicate: fn(&<T as Node>::Value, &<T as Node>::Value) -> bool,
+        g: fn(&<T as Node>::Value, <T as Node>::Value) -> <T as Node>::Value,
+        value: <T as Node>::Value,
+    ) -> usize {
+        if i == j {
+            return i;
+        }
+        let mid = (i + j) / 2;
+        let left_node = self.nodes[curr_node].left_child();
+        let right_node = self.nodes[curr_node].right_child();
+        let left_value = self.nodes[left_node].value();
+        if predicate(left_value, &value) {
+            self.lower_bound_helper(left_node, i, mid, predicate, g, value)
+        } else {
+            let value = g(left_value, value);
+            self.lower_bound_helper(right_node, mid + 1, j, predicate, g, value)
+        }
     }
 }
 #[cfg(test)]

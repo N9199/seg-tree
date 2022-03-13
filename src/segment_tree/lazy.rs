@@ -7,7 +7,7 @@ pub struct LazySegmentTree<T: LazyNode> {
     n: usize,
 }
 
-impl<T: LazyNode + Clone + std::fmt::Debug> LazySegmentTree<T> {
+impl<T: LazyNode + Clone> LazySegmentTree<T> {
     /// Builds lazy segment tree from slice, each element of the slice will correspond to a leaf of the segment tree.
     /// It has time complexity of `O(n*log(n))`, assuming that [combine](Node::combine) has constant time complexity.
     pub fn build(values: &[T]) -> Self {
@@ -26,7 +26,6 @@ impl<T: LazyNode + Clone + std::fmt::Debug> LazySegmentTree<T> {
     fn build_helper(&mut self, curr_node: usize, i: usize, j: usize, values: &[T]) {
         if i == j {
             self.nodes[curr_node] = values[i].clone();
-            println!("{curr_node} [{i},{j}] value: {:?}", self.nodes[curr_node]);
             return;
         }
         let mid = (i + j) / 2;
@@ -35,7 +34,6 @@ impl<T: LazyNode + Clone + std::fmt::Debug> LazySegmentTree<T> {
         self.build_helper(left_node, i, mid, values);
         self.build_helper(right_node, mid + 1, j, values);
         self.nodes[curr_node] = T::combine(&self.nodes[left_node], &self.nodes[right_node]);
-        println!("{curr_node} [{i},{j}] value: {:?}", self.nodes[curr_node]);
     }
 
     fn push(&mut self, u: usize, i: usize, j: usize) {
@@ -50,8 +48,8 @@ impl<T: LazyNode + Clone + std::fmt::Debug> LazySegmentTree<T> {
         self.nodes[u].lazy_update(i, j);
     }
 
-    /// Updates the range \[i,j\] with value.
-    /// It will panic if `i` or `j` is not in \[0,n).
+    /// Updates the range `[i,j]` with value.
+    /// It will panic if `i` or `j` is not in `[0,n]`.
     /// It has time complexity of `O(log(n))`, assuming that [combine](Node::combine), [update_lazy_value](LazyNode::update_lazy_value) and [update_lazy_value](LazyNode::lazy_update) have constant time complexity.
     pub fn update(&mut self, i: usize, j: usize, value: <T as Node>::Value) {
         self.update_helper(i, j, &value, 0, 0, self.n - 1);
@@ -85,7 +83,7 @@ impl<T: LazyNode + Clone + std::fmt::Debug> LazySegmentTree<T> {
         self.nodes[curr_node] = T::combine(&self.nodes[left], &self.nodes[right]);
     }
 
-    /// Returns the result from the range \[left,right\].
+    /// Returns the result from the range `[left,right]`.
     /// It returns None if and only if range is empty.
     /// It will **panic** if `left` or `right` are not in [0,n).
     /// It has time complexity of `O(log(n))`, assuming that [combine](Node::combine), [update_lazy_value](LazyNode::update_lazy_value) and [update_lazy_value](LazyNode::lazy_update) have constant time complexity.
@@ -124,48 +122,70 @@ impl<T: LazyNode + Clone + std::fmt::Debug> LazySegmentTree<T> {
         }
     }
 
-    // /// A method that finds the leftmost leaf node `u` such that `predicate(u.value, value)` is `true`.
-    // /// `predicate(u.value, value)` must be non-decreasing over the tree, more specifically for every node `u` with left child `v` and right child `w`, if `predicate(v.value, value)` then `predicate(u.value, value)`.
-    // /// `g` is used to calculate the new value for a recursive call, more specifically, given a node `u` with corresponding interval \[i,j\], and children `v` amd `w`,
-    // /// ```
-    // /// # use seg_tree::{segment_tree::LazySegmentTree,default::Sum,nodes::Node};
-    // /// let g = |left_node:&usize,value:usize|{value-*left_node};
-    // /// let predicate = |left_value:&usize, value:&usize|{*left_value>=*value};
-    // /// # let nodes: Vec<Sum<usize>> = (0..10).map(|x| Sum::initialize(&x)).collect();
-    // /// let seg_tree = LazySegmentTree::build(&nodes);
-    // /// #assert_eq!(seg_tree.lower_bound(predicate, g, 3), 2);
-    // /// ```
-    // pub fn lower_bound(
-    //     &self,
-    //     predicate: fn(&<T as Node>::Value, &<T as Node>::Value) -> bool,
-    //     g: fn(&<T as Node>::Value, <T as Node>::Value) -> <T as Node>::Value,
-    //     value: <T as Node>::Value,
-    // ) -> usize {
-    //     self.lower_bound_helper(0, 0, self.n - 1, predicate, g, value)
-    // }
-    // fn lower_bound_helper(
-    //     &self,
-    //     curr_node: usize,
-    //     i: usize,
-    //     j: usize,
-    //     predicate: fn(&<T as Node>::Value, &<T as Node>::Value) -> bool,
-    //     g: fn(&<T as Node>::Value, <T as Node>::Value) -> <T as Node>::Value,
-    //     value: <T as Node>::Value,
-    // ) -> usize {
-    //     if i == j {
-    //         return i;
-    //     }
-    //     let mid = (i + j) / 2;
-    //     let left_node = 2 * curr_node + 1;
-    //     let right_node = 2 * curr_node + 2;
-    //     let left_value = self.nodes[left_node].value();
-    //     if predicate(left_value, &value) {
-    //         self.lower_bound_helper(left_node, i, mid, predicate, g, value)
-    //     } else {
-    //         let value = g(left_value, value);
-    //         self.lower_bound_helper(right_node, mid + 1, j, predicate, g, value)
-    //     }
-    // }
+    /// A method that finds the smallest prefix[^note] `u` such that `predicate(u.value(), value)` is `true`. The following must be true:
+    /// - `predicate` is monotonic over prefixes[^note2].
+    /// - `g` will satisfy the following, given segments `[i,j]` and `[i,k]` with `j<k` we have that `predicate([i,k].value(),value)` implies `predicate([j+1,k].value(),g([i,j].value(),value))`.
+    /// 
+    /// These are two examples, the first is finding the smallest prefix which sums at least some value.
+    /// ```
+    /// # use seg_tree::{segment_tree::LazySegmentTree,default::Sum,nodes::Node};
+    /// let predicate = |left_value:&usize, value:&usize|{*left_value>=*value}; // Is the sum greater or equal to value?
+    /// let g = |left_node:&usize,value:usize|{value-*left_node}; // Subtract the sum of the prefix.
+    /// # let nodes: Vec<Sum<usize>> = (0..10).map(|x| Sum::initialize(&x)).collect();
+    /// let seg_tree = LazySegmentTree::build(&nodes); // [0,1,2,3,4,5,6,7,8,9] with Sum<usize> nodes
+    /// let index = seg_tree.lower_bound(predicate, g, 3); // Will return 2 as sum([0,1,2])>=3
+    /// # let sums = vec![0,1,3,6,10,15,21,28,36,45];
+    /// # for i in 0..10{
+    /// #    assert_eq!(seg_tree.lower_bound(predicate, g, sums[i]), i);
+    /// # }
+    /// ```
+    /// The second is finding the position of the smallest value greater or equal to some value.
+    /// ```
+    /// # use seg_tree::{segment_tree::LazySegmentTree,default::Max,nodes::Node};
+    /// let predicate = |left_value:&usize, value:&usize|{*left_value>=*value}; // Is the maximum greater or equal to value?
+    /// let g = |_left_node:&usize,value:usize|{value}; // Do nothing
+    /// # let nodes: Vec<Max<usize>> = (0..10).map(|x| Max::initialize(&x)).collect();
+    /// let seg_tree = LazySegmentTree::build(&nodes); // [0,1,2,3,4,5,6,7,8,9] with Max<usize> nodes
+    /// let index = seg_tree.lower_bound(predicate, g, 3); // Will return 3 as 3>=3
+    /// # for i in 0..10{
+    /// #    assert_eq!(seg_tree.lower_bound(predicate, g, i), i);
+    /// # }
+    /// ```
+    /// 
+    /// [^note]: A prefix is a segment of the form `[0,i]`.
+    /// 
+    /// [^note2]: Given two prefixes `u` and `v` if `u` is contained in `v` then `predicate(u.value(), value)` implies `predicate(v.value(), value)`.
+    pub fn lower_bound(
+        &self,
+        predicate: fn(&<T as Node>::Value, &<T as Node>::Value) -> bool,
+        g: fn(&<T as Node>::Value, <T as Node>::Value) -> <T as Node>::Value,
+        value: <T as Node>::Value,
+    ) -> usize {
+        self.lower_bound_helper(0, 0, self.n - 1, predicate, g, value)
+    }
+    fn lower_bound_helper(
+        &self,
+        curr_node: usize,
+        i: usize,
+        j: usize,
+        predicate: fn(&<T as Node>::Value, &<T as Node>::Value) -> bool,
+        g: fn(&<T as Node>::Value, <T as Node>::Value) -> <T as Node>::Value,
+        value: <T as Node>::Value,
+    ) -> usize {
+        if i == j {
+            return i;
+        }
+        let mid = (i + j) / 2;
+        let left_node = 2 * curr_node + 1;
+        let right_node = 2 * curr_node + 2;
+        let left_value = self.nodes[left_node].value();
+        if predicate(left_value, &value) {
+            self.lower_bound_helper(left_node, i, mid, predicate, g, value)
+        } else {
+            let value = g(left_value, value);
+            self.lower_bound_helper(right_node, mid + 1, j, predicate, g, value)
+        }
+    }
 }
 
 #[cfg(test)]
