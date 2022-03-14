@@ -13,3 +13,11 @@ exclude = [
 ]
 [dependencies]
 # seg-tree-macros = {version = "0.1.0", path = "seg-tree-macros"}
+
+[dev-dependencies]
+criterion = {version = "0.3", features = ["html_reports"]}
+rand = "0.8.5"
+
+[[bench]]
+name = "my_benchmark"
+harness = false
