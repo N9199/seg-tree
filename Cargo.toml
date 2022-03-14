@@ -11,8 +11,6 @@ license = "AGPL-3.0-or-later"
 exclude = [
     ".github/"
 ]
-[dependencies]
-# seg-tree-macros = {version = "0.1.0", path = "seg-tree-macros"}
 
 [dev-dependencies]
 criterion = {version = "0.3", features = ["html_reports"]}
