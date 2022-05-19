@@ -1,6 +1,6 @@
 use std::ops::{Add, Mul};
 
-use crate::nodes::{LazyNode, Node, PersistentNode};
+use crate::nodes::{LazyNode, Node};
 
 /// Implementation of range sum for generic type T, it implements [Node], [LazyNode] and [PersistentNode], as such it can be used as a node in every segment tree type.
 #[derive(Clone, Debug)]
@@ -10,8 +10,6 @@ where
 {
     value: T,
     lazy_value: Option<T>,
-    left: usize,
-    right: usize,
 }
 
 impl<T> Node for Sum<T>
@@ -24,8 +22,6 @@ where
         Sum {
             value: v.clone(),
             lazy_value: None,
-            left: 0,
-            right: 0,
         }
     }
     /// As this is a range sum node, the operation which is used to 'merge' two nodes is `+`.
@@ -33,8 +29,6 @@ where
         Sum {
             value: a.value.clone() + b.value.clone(),
             lazy_value: None,
-            left: 0,
-            right: 0,
         }
     }
     fn value(&self) -> &Self::Value {
@@ -68,31 +62,13 @@ where
         self.lazy_value.as_ref()
     }
 }
-/// This is a pretty generic implementation of [PersistentNode] for a struct.
-impl<T> PersistentNode for Sum<T>
-where
-    T: Add<Output = T> + Clone,
-{
-    fn left_child(&self) -> usize {
-        self.left
-    }
-
-    fn right_child(&self) -> usize {
-        self.right
-    }
-
-    fn set_children(&mut self, left: usize, right: usize) {
-        self.left = left;
-        self.right = right;
-    }
-}
 
 #[cfg(test)]
 mod tests {
     use std::ops::{Add, Mul};
 
     use crate::{
-        default::Sum,
+        utils::Sum,
         nodes::{LazyNode, Node},
     };
 

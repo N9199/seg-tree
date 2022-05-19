@@ -128,7 +128,7 @@ impl<T: LazyNode + Clone> LazySegmentTree<T> {
     /// 
     /// These are two examples, the first is finding the smallest prefix which sums at least some value.
     /// ```
-    /// # use seg_tree::{segment_tree::LazySegmentTree,default::Sum,nodes::Node};
+    /// # use seg_tree::{segment_tree::LazySegmentTree,utils::Sum,nodes::Node};
     /// let predicate = |left_value:&usize, value:&usize|{*left_value>=*value}; // Is the sum greater or equal to value?
     /// let g = |left_node:&usize,value:usize|{value-*left_node}; // Subtract the sum of the prefix.
     /// # let nodes: Vec<Sum<usize>> = (0..10).map(|x| Sum::initialize(&x)).collect();
@@ -141,7 +141,7 @@ impl<T: LazyNode + Clone> LazySegmentTree<T> {
     /// ```
     /// The second is finding the position of the smallest value greater or equal to some value.
     /// ```
-    /// # use seg_tree::{segment_tree::LazySegmentTree,default::Max,nodes::Node};
+    /// # use seg_tree::{segment_tree::LazySegmentTree,utils::Max,nodes::Node};
     /// let predicate = |left_value:&usize, value:&usize|{*left_value>=*value}; // Is the maximum greater or equal to value?
     /// let g = |_left_node:&usize,value:usize|{value}; // Do nothing
     /// # let nodes: Vec<Max<usize>> = (0..10).map(|x| Max::initialize(&x)).collect();
@@ -190,7 +190,7 @@ impl<T: LazyNode + Clone> LazySegmentTree<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{default::Min, nodes::Node};
+    use crate::{utils::Min, nodes::Node};
 
     use super::LazySegmentTree;
     // TODO Add more tests
