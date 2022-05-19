@@ -79,7 +79,7 @@ where
 }
 #[cfg(test)]
 mod tests {
-    use crate::{default::Min, nodes::Node};
+    use crate::{utils::Min, nodes::Node};
 
     use super::SegmentTree;
 

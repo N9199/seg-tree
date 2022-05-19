@@ -13,7 +13,7 @@
 
 #![warn(missing_docs)]
 /// Provided node implementations.
-pub mod default;
+pub mod utils;
 /// Node traits.
 pub mod nodes;
 /// Segment trees.

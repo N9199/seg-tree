@@ -1,5 +1,4 @@
 use super::Node;
-
 /// Required trait by nodes of persistent segment trees.
 pub trait PersistentNode: Node {
     /// Gives index of left child.
@@ -9,5 +8,3 @@ pub trait PersistentNode: Node {
     /// Sets saved index of both left and right children.
     fn set_children(&mut self, left: usize, right: usize);
 }
-
-//pub use seg_tree_macros::*;

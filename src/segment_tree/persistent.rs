@@ -17,7 +17,7 @@ where
     pub fn build(values: &[T]) -> Self {
         let n = values.len();
         let mut temp = Self {
-            nodes: Vec::with_capacity(4*n),
+            nodes: Vec::with_capacity(4 * n),
             roots: Vec::with_capacity(1),
             n,
         };
@@ -118,13 +118,14 @@ where
     /// A method that finds the smallest prefix[^note] `u` such that `predicate(u.value(), value)` is `true`. The following must be true:
     /// - `predicate` is monotonic over prefixes[^note2].
     /// - `g` will satisfy the following, given segments `[i,j]` and `[i,k]` with `j<k` we have that `predicate([i,k].value(),value)` implies `predicate([j+1,k].value(),g([i,j].value(),value))`.
-    /// 
+    ///
     /// These are two examples, the first is finding the smallest prefix which sums at least some value.
     /// ```
-    /// # use seg_tree::{segment_tree::PersistentSegmentTree,default::Sum,nodes::Node};
+    /// # use seg_tree::{segment_tree::PersistentSegmentTree,utils::{Sum, PersistentWrapper},nodes::Node};
+    /// # type PSum<T> = PersistentWrapper<Sum<T>>;
     /// let predicate = |left_value:&usize, value:&usize|{*left_value>=*value}; // Is the sum greater or equal to value?
     /// let g = |left_node:&usize,value:usize|{value-*left_node}; // Subtract the sum of the prefix.
-    /// # let nodes: Vec<Sum<usize>> = (0..10).map(|x| Sum::initialize(&x)).collect();
+    /// # let nodes: Vec<PSum<usize>> = (0..10).map(|x| PSum::initialize(&x)).collect();
     /// let seg_tree = PersistentSegmentTree::build(&nodes); // [0,1,2,3,4,5,6,7,8,9] with Sum<usize> nodes
     /// let index = seg_tree.lower_bound(0, predicate, g, 3); // Will return 2 as sum([0,1,2])>=3
     /// # let sums = vec![0,1,3,6,10,15,21,28,36,45];
@@ -134,19 +135,20 @@ where
     /// ```
     /// The second is finding the position of the smallest value greater or equal to some value.
     /// ```
-    /// # use seg_tree::{segment_tree::PersistentSegmentTree,default::Max,nodes::Node};
+    /// # use seg_tree::{segment_tree::PersistentSegmentTree,utils::{Max, PersistentWrapper},nodes::Node};
+    /// # type PMax<T> = PersistentWrapper<Max<T>>;
     /// let predicate = |left_value:&usize, value:&usize|{*left_value>=*value}; // Is the maximum greater or equal to value?
     /// let g = |_left_node:&usize,value:usize|{value}; // Do nothing
-    /// # let nodes: Vec<Max<usize>> = (0..10).map(|x| Max::initialize(&x)).collect();
+    /// # let nodes: Vec<PMax<usize>> = (0..10).map(|x| PMax::initialize(&x)).collect();
     /// let seg_tree = PersistentSegmentTree::build(&nodes); // [0,1,2,3,4,5,6,7,8,9] with Max<usize> nodes
     /// let index = seg_tree.lower_bound(0, predicate, g, 3); // Will return 3 as 3>=3
     /// # for i in 0..10{
     /// #    assert_eq!(seg_tree.lower_bound(0, predicate, g, i), i);
     /// # }
     /// ```
-    /// 
+    ///
     /// [^note]: A prefix is a segment of the form `[0,i]`.
-    /// 
+    ///
     /// [^note2]: Given two prefixes `u` and `v` if `u` is contained in `v` then `predicate(u.value(), value)` implies `predicate(v.value(), value)`.
     pub fn lower_bound(
         &self,
@@ -183,23 +185,27 @@ where
 }
 #[cfg(test)]
 mod tests {
-    use crate::{default::Sum, nodes::Node, segment_tree::PersistentSegmentTree};
-
+    use crate::{
+        nodes::Node,
+        segment_tree::PersistentSegmentTree,
+        utils::{PersistentWrapper, Sum},
+    };
+    type PSum<T> = PersistentWrapper<Sum<T>>;
     #[test]
     fn non_empty_query_returns_some() {
-        let nodes: Vec<Sum<usize>> = (0..=10).map(|x| Sum::initialize(&x)).collect();
+        let nodes: Vec<PSum<usize>> = (0..=10).map(|x| PSum::initialize(&x)).collect();
         let segment_tree = PersistentSegmentTree::build(&nodes);
         assert!(segment_tree.query(0, 0, 10).is_some());
     }
     #[test]
     fn empty_query_returns_none() {
-        let nodes: Vec<Sum<usize>> = (0..=10).map(|x| Sum::initialize(&x)).collect();
+        let nodes: Vec<PSum<usize>> = (0..=10).map(|x| PSum::initialize(&x)).collect();
         let segment_tree = PersistentSegmentTree::build(&nodes);
         assert!(segment_tree.query(0, 10, 0).is_none());
     }
     #[test]
     fn normal_update_works() {
-        let nodes: Vec<Sum<usize>> = (0..=10).map(|x| Sum::initialize(&x)).collect();
+        let nodes: Vec<PSum<usize>> = (0..=10).map(|x| PSum::initialize(&x)).collect();
         let mut segment_tree = PersistentSegmentTree::build(&nodes);
         let value = 20;
         segment_tree.update(0, 0, value);
@@ -208,7 +214,7 @@ mod tests {
 
     #[test]
     fn branched_update_works() {
-        let nodes: Vec<Sum<usize>> = (0..=10).map(|x| Sum::initialize(&x)).collect();
+        let nodes: Vec<PSum<usize>> = (0..=10).map(|x| PSum::initialize(&x)).collect();
         let mut segment_tree = PersistentSegmentTree::build(&nodes);
         let value = 20;
         segment_tree.update(0, 0, value);
@@ -219,7 +225,7 @@ mod tests {
 
     #[test]
     fn query_works() {
-        let nodes: Vec<Sum<usize>> = (0..=10).map(|x| Sum::initialize(&x)).collect();
+        let nodes: Vec<PSum<usize>> = (0..=10).map(|x| PSum::initialize(&x)).collect();
         let segment_tree = PersistentSegmentTree::build(&nodes);
         assert_eq!(segment_tree.query(0, 0, 10).unwrap().value(), &55);
     }
