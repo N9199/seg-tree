@@ -52,7 +52,7 @@ mod tests {
         let expected_answer = {
             let mut best_sum = 0;
             let mut current_sum = 0;
-            for val in nodes.iter(){
+            for val in nodes.iter() {
                 current_sum = 0.max(current_sum + val);
                 best_sum = best_sum.max(current_sum);
             }
