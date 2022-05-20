@@ -1,7 +1,10 @@
 mod max;
 mod max_subarray_sum;
 mod min;
-mod sum;
 mod persistent_wrapper;
+mod sum;
 
-pub use self::{max::Max, max_subarray_sum::MaxSubArraySum, min::Min, sum::Sum, persistent_wrapper::PersistentWrapper};
+pub use self::{
+    max::Max, max_subarray_sum::MaxSubArraySum, min::Min, persistent_wrapper::PersistentWrapper,
+    sum::Sum,
+};

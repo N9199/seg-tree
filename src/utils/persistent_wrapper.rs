@@ -1,7 +1,7 @@
 use crate::nodes::{LazyNode, Node, PersistentNode};
 
 /// A simple wrapper for nodes to easily implement [PersistentNode]. If the wrapped node implements [LazyNode] the wrapper also implements it.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct PersistentWrapper<T>
 where
     T: Node,
@@ -68,5 +68,18 @@ where
     fn set_children(&mut self, left: usize, right: usize) {
         self.left = left;
         self.right = right;
+    }
+}
+
+impl<T> From<T> for PersistentWrapper<T>
+where
+    T: Node,
+{
+    fn from(node: T) -> Self {
+        Self {
+            node,
+            left: 0,
+            right: 0,
+        }
     }
 }

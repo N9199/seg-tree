@@ -52,14 +52,12 @@ where
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use crate::{
         nodes::{LazyNode, Node},
         utils::Min,
     };
-
 
     #[test]
     fn min_works() {
@@ -69,8 +67,7 @@ mod tests {
             .fold(Min::initialize(&0), |acc, new| Min::combine(&acc, new));
         assert_eq!(result.value(), &0);
     }
-    
-    
+
     #[test]
     fn update_lazy_value_works() {
         let mut node = Min::initialize(&1);

@@ -3,7 +3,7 @@ use super::Node;
 /// Required trait by nodes of lazy segment trees.
 /// It's defined as an interface for the operations needed on the lazy_value.
 /// It is recommended to implement it using an Option type.
-/// See [Implementators](#Implementators) for some example implementations
+/// See [Implementors](LazyNode#implementors) for some example implementations.
 pub trait LazyNode: Node {
     /// The following invariant must be met while implementing this method, if lazy_value is called immediately after this function then it must return `None`. (See [Option::take])
     fn lazy_update(&mut self, i: usize, j: usize);

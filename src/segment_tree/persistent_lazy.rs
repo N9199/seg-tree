@@ -10,7 +10,7 @@ pub struct LazyPersistentSegmentTree<T: PersistentNode + LazyNode> {
 
 impl<T> LazyPersistentSegmentTree<T>
 where
-    T: PersistentNode + LazyNode + Clone, // + std::fmt::Debug,
+    T: PersistentNode + LazyNode + Clone,
 {
     /// Builds a lazy persistent segment tree from slice, each element of the slice will correspond to a leaf of the segment tree.
     /// It has time complexity of `O(n*log(n))`, assuming that [combine](Node::combine) has constant time complexity.
@@ -97,7 +97,7 @@ where
         }
     }
 
-    // Creates a new segment tree version from version were the p-th element of the segment tree to value T and update the segment tree correspondingly.
+    /// Creates a new segment tree version from version were the p-th element of the segment tree to value T and update the segment tree correspondingly.
     /// It will panic if p is not in `[0,n)`, or if version is not in [0,[versions](LazyPersistentSegmentTree::versions)).
     /// It has time complexity of `O(log(n))`, assuming that [combine](Node::combine), [update_lazy_value](LazyNode::update_lazy_value) and [update_lazy_value](LazyNode::lazy_update) have constant time complexity.
     pub fn update(&mut self, version: usize, left: usize, right: usize, value: <T as Node>::Value) {
@@ -146,8 +146,8 @@ where
     /// ```
     /// # use seg_tree::{segment_tree::LazyPersistentSegmentTree,utils::{Sum, PersistentWrapper},nodes::Node};
     /// # type PSum<T> = PersistentWrapper<Sum<T>>;
-    /// let predicate = |left_value:&usize, value:&usize|{*left_value>=*value}; // Is the sum greater or equal to value?
-    /// let g = |left_node:&usize,value:usize|{value-*left_node}; // Subtract the sum of the prefix.
+    /// let predicate = |left_value: &usize, value: &usize|{ *left_value >= *value }; // Is the sum greater or equal to value?
+    /// let g = |left_node: &usize, value: usize|{ value - *left_node }; // Subtract the sum of the prefix.
     /// # let nodes: Vec<PSum<usize>> = (0..10).map(|x| PSum::initialize(&x)).collect();
     /// let seg_tree = LazyPersistentSegmentTree::build(&nodes); // [0,1,2,3,4,5,6,7,8,9] with Sum<usize> nodes
     /// let index = seg_tree.lower_bound(0, predicate, g, 3); // Will return 2 as sum([0,1,2])>=3
@@ -173,29 +173,31 @@ where
     /// [^note]: A prefix is a segment of the form `[0,i]`.
     ///
     /// [^note2]: Given two prefixes `u` and `v` if `u` is contained in `v` then `predicate(u.value(), value)` implies `predicate(v.value(), value)`.
-    pub fn lower_bound<F>(
+    pub fn lower_bound<F, G>(
         &self,
         version: usize,
         predicate: F,
-        g: fn(&<T as Node>::Value, <T as Node>::Value) -> <T as Node>::Value,
+        g: G,
         value: <T as Node>::Value,
     ) -> usize
     where
         F: Fn(&<T as Node>::Value, &<T as Node>::Value) -> bool,
+        G: Fn(&<T as Node>::Value, <T as Node>::Value) -> <T as Node>::Value,
     {
         self.lower_bound_helper(self.roots[version], 0, self.n - 1, predicate, g, value)
     }
-    fn lower_bound_helper<F>(
+    fn lower_bound_helper<F, G>(
         &self,
         curr_node: usize,
         i: usize,
         j: usize,
         predicate: F,
-        g: fn(&<T as Node>::Value, <T as Node>::Value) -> <T as Node>::Value,
+        g: G,
         value: <T as Node>::Value,
     ) -> usize
     where
         F: Fn(&<T as Node>::Value, &<T as Node>::Value) -> bool,
+        G: Fn(&<T as Node>::Value, <T as Node>::Value) -> <T as Node>::Value,
     {
         if i == j {
             return i;

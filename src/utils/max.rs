@@ -52,14 +52,12 @@ where
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use crate::{
         nodes::{LazyNode, Node},
         utils::Max,
     };
-
 
     #[test]
     fn max_works() {
@@ -69,8 +67,7 @@ mod tests {
             .fold(Max::initialize(&0), |acc, new| Max::combine(&acc, new));
         assert_eq!(result.value(), &1000000);
     }
-    
-    
+
     #[test]
     fn update_lazy_value_works() {
         let mut node = Max::initialize(&1);
