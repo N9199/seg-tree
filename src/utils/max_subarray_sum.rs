@@ -1,6 +1,5 @@
 use crate::nodes::Node;
 
-
 /// Implementation of the solution to the maximum subarray problem. It just implements [Node].
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct MaxSubArraySum {
@@ -34,5 +33,40 @@ impl Node for MaxSubArraySum {
     }
     fn value(&self) -> &Self::Value {
         &self.max_sum
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use rand::{prelude::SliceRandom, thread_rng};
+
+    use crate::{nodes::Node, utils::MaxSubArraySum};
+
+    #[test]
+    fn max_sub_array_sum_works() {
+        let mut rng = thread_rng();
+        let n = 1000000 / 2;
+        let mut nodes: Vec<_> = (-n..=n).collect();
+        nodes.shuffle(&mut rng);
+        // See https://en.wikipedia.org/wiki/Maximum_subarray_problem#Kadane's_algorithm
+        let expected_answer = {
+            let mut best_sum = 0;
+            let mut current_sum = 0;
+            for val in nodes.iter(){
+                current_sum = 0.max(current_sum + val);
+                best_sum = best_sum.max(current_sum);
+            }
+            best_sum
+        };
+        let nodes: Vec<MaxSubArraySum> = nodes
+            .into_iter()
+            .map(|x| MaxSubArraySum::initialize(&x))
+            .collect();
+        let result = nodes
+            .iter()
+            .fold(MaxSubArraySum::initialize(&0), |acc, new| {
+                MaxSubArraySum::combine(&acc, new)
+            });
+        assert_eq!(result.value(), &expected_answer);
     }
 }

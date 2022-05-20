@@ -1,6 +1,6 @@
 use crate::nodes::{LazyNode, Node, PersistentNode};
 
-/// A simple wrapper for nodes, such that it implements [PersistentNode]. If the wrapped node implements [LazyNode] the wrapper also implements it.
+/// A simple wrapper for nodes to easily implement [PersistentNode]. If the wrapped node implements [LazyNode] the wrapper also implements it.
 #[derive(Clone)]
 pub struct PersistentWrapper<T>
 where

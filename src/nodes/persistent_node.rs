@@ -5,6 +5,6 @@ pub trait PersistentNode: Node {
     fn left_child(&self) -> usize;
     /// Gives index of right child.
     fn right_child(&self) -> usize;
-    /// Sets saved index of both left and right children.
+    /// Sets saved index of both left and right children. (It's assumed that before a call to this, the node has invalid indices.)
     fn set_children(&mut self, left: usize, right: usize);
 }
