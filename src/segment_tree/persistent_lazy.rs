@@ -162,7 +162,7 @@ where
     /// # type PMax<T> = PersistentWrapper<Max<T>>;
     /// let predicate = |left_value:&usize, value:&usize|{*left_value>=*value}; // Is the maximum greater or equal to value?
     /// let g = |_left_node:&usize,value:usize|{value}; // Do nothing
-    /// # let nodes: Vec<Max<usize>> = (0..10).map(|x| Max::initialize(&x)).collect();
+    /// # let nodes: Vec<PMax<usize>> = (0..10).map(|x| PMax::initialize(&x)).collect();
     /// let seg_tree = LazyPersistentSegmentTree::build(&nodes); // [0,1,2,3,4,5,6,7,8,9] with Max<usize> nodes
     /// let index = seg_tree.lower_bound(0, predicate, g, 3); // Will return 3 as 3>=3
     /// # for i in 0..10{
