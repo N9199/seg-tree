@@ -1,6 +1,5 @@
 use crate::nodes::{LazyNode, Node, PersistentNode};
 
-
 /// Lazy persistent segment tree, it saves every version of itself, it has range queries and range updates.
 /// It uses `O(n+q*log(n))` space, where `q` is the amount of updates, and assuming that each node uses `O(1)` space.
 pub struct LazyPersistentSegmentTree<T: PersistentNode + LazyNode> {
@@ -18,7 +17,7 @@ where
     pub fn build(values: &[T]) -> Self {
         let n = values.len();
         let mut temp = Self {
-            nodes: Vec::with_capacity(4*n),
+            nodes: Vec::with_capacity(4 * n),
             roots: Vec::with_capacity(1),
             n,
         };
@@ -142,7 +141,7 @@ where
     /// A method that finds the smallest prefix[^note] `u` such that `predicate(u.value(), value)` is `true`. The following must be true:
     /// - `predicate` is monotonic over prefixes[^note2].
     /// - `g` will satisfy the following, given segments `[i,j]` and `[i,k]` with `j<k` we have that `predicate([i,k].value(),value)` implies `predicate([j+1,k].value(),g([i,j].value(),value))`.
-    /// 
+    ///
     /// These are two examples, the first is finding the smallest prefix which sums at least some value.
     /// ```
     /// # use seg_tree::{segment_tree::LazyPersistentSegmentTree,utils::{Sum, PersistentWrapper},nodes::Node};
@@ -170,28 +169,34 @@ where
     /// #    assert_eq!(seg_tree.lower_bound(0, predicate, g, i), i);
     /// # }
     /// ```
-    /// 
+    ///
     /// [^note]: A prefix is a segment of the form `[0,i]`.
-    /// 
+    ///
     /// [^note2]: Given two prefixes `u` and `v` if `u` is contained in `v` then `predicate(u.value(), value)` implies `predicate(v.value(), value)`.
-    pub fn lower_bound(
+    pub fn lower_bound<F>(
         &self,
         version: usize,
-        predicate: fn(&<T as Node>::Value, &<T as Node>::Value) -> bool,
+        predicate: F,
         g: fn(&<T as Node>::Value, <T as Node>::Value) -> <T as Node>::Value,
         value: <T as Node>::Value,
-    ) -> usize {
+    ) -> usize
+    where
+        F: Fn(&<T as Node>::Value, &<T as Node>::Value) -> bool,
+    {
         self.lower_bound_helper(self.roots[version], 0, self.n - 1, predicate, g, value)
     }
-    fn lower_bound_helper(
+    fn lower_bound_helper<F>(
         &self,
         curr_node: usize,
         i: usize,
         j: usize,
-        predicate: fn(&<T as Node>::Value, &<T as Node>::Value) -> bool,
+        predicate: F,
         g: fn(&<T as Node>::Value, <T as Node>::Value) -> <T as Node>::Value,
         value: <T as Node>::Value,
-    ) -> usize {
+    ) -> usize
+    where
+        F: Fn(&<T as Node>::Value, &<T as Node>::Value) -> bool,
+    {
         if i == j {
             return i;
         }
@@ -210,7 +215,9 @@ where
 #[cfg(test)]
 mod tests {
     use crate::{
-        utils::{Sum, PersistentWrapper}, nodes::Node, segment_tree::persistent_lazy::LazyPersistentSegmentTree,
+        nodes::Node,
+        segment_tree::persistent_lazy::LazyPersistentSegmentTree,
+        utils::{PersistentWrapper, Sum},
     };
     type PSum<T> = PersistentWrapper<Sum<T>>;
     #[test]

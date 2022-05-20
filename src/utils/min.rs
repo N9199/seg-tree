@@ -1,6 +1,6 @@
-use crate::nodes::{LazyNode, Node, PersistentNode};
+use crate::nodes::{LazyNode, Node};
 
-/// Implementation of range min for generic type T, it implements [Node], [LazyNode] and [PersistentNode].
+/// Implementation of range min for generic type T, it implements [Node] and [LazyNode].
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Min<T>
 where
@@ -8,8 +8,6 @@ where
 {
     value: T,
     lazy_value: Option<T>,
-    left: usize,
-    right: usize,
 }
 
 impl<T> Node for Min<T>
@@ -21,16 +19,12 @@ where
         Min {
             value: v.clone(),
             lazy_value: None,
-            left: 0,
-            right: 0,
         }
     }
     fn combine(a: &Self, b: &Self) -> Self {
         Min {
             value: a.value.clone().min(b.value.clone()),
             lazy_value: None,
-            left: 0,
-            right: 0,
         }
     }
     fn value(&self) -> &Self::Value {
@@ -58,21 +52,38 @@ where
     }
 }
 
-/// This is a pretty generic implementation of [PersistentNode] for a struct.
-impl<T> PersistentNode for Min<T>
-where
-    T: Ord + Clone,
-{
-    fn left_child(&self) -> usize {
-        self.left
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        nodes::{LazyNode, Node},
+        utils::Min,
+    };
+
+
+    #[test]
+    fn min_works() {
+        let nodes: Vec<Min<usize>> = (0..=1000000).map(|x| Min::initialize(&x)).collect();
+        let result = nodes
+            .iter()
+            .fold(Min::initialize(&0), |acc, new| Min::combine(&acc, new));
+        assert_eq!(result.value(), &0);
+    }
+    
+    
+    #[test]
+    fn update_lazy_value_works() {
+        let mut node = Min::initialize(&1);
+        node.update_lazy_value(&2);
+        assert_eq!(node.lazy_value(), Some(&2));
     }
 
-    fn right_child(&self) -> usize {
-        self.right
-    }
-
-    fn set_children(&mut self, left: usize, right: usize) {
-        self.left = left;
-        self.right = right;
+    #[test]
+    fn lazy_update_works() {
+        // Node represents the range [0,10] with min 1.
+        let mut node = Min::initialize(&1);
+        node.update_lazy_value(&2);
+        node.lazy_update(0, 10);
+        assert_eq!(node.value(), &2);
     }
 }

@@ -150,24 +150,30 @@ where
     /// [^note]: A prefix is a segment of the form `[0,i]`.
     ///
     /// [^note2]: Given two prefixes `u` and `v` if `u` is contained in `v` then `predicate(u.value(), value)` implies `predicate(v.value(), value)`.
-    pub fn lower_bound(
+    pub fn lower_bound<F>(
         &self,
         version: usize,
-        predicate: fn(&<T as Node>::Value, &<T as Node>::Value) -> bool,
+        predicate: F,
         g: fn(&<T as Node>::Value, <T as Node>::Value) -> <T as Node>::Value,
         value: <T as Node>::Value,
-    ) -> usize {
+    ) -> usize
+    where
+        F: Fn(&<T as Node>::Value, &<T as Node>::Value) -> bool,
+    {
         self.lower_bound_helper(self.roots[version], 0, self.n - 1, predicate, g, value)
     }
-    fn lower_bound_helper(
+    fn lower_bound_helper<F>(
         &self,
         curr_node: usize,
         i: usize,
         j: usize,
-        predicate: fn(&<T as Node>::Value, &<T as Node>::Value) -> bool,
+        predicate: F,
         g: fn(&<T as Node>::Value, <T as Node>::Value) -> <T as Node>::Value,
         value: <T as Node>::Value,
-    ) -> usize {
+    ) -> usize
+    where
+        F: Fn(&<T as Node>::Value, &<T as Node>::Value) -> bool,
+    {
         if i == j {
             return i;
         }

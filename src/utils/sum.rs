@@ -2,7 +2,7 @@ use std::ops::{Add, Mul};
 
 use crate::nodes::{LazyNode, Node};
 
-/// Implementation of range sum for generic type T, it implements [Node], [LazyNode] and [PersistentNode], as such it can be used as a node in every segment tree type.
+/// Implementation of range sum for generic type T, it implements [Node] and [LazyNode], as such it can be used as a node in every segment tree type.
 #[derive(Clone, Debug)]
 pub struct Sum<T>
 where
@@ -68,8 +68,8 @@ mod tests {
     use std::ops::{Add, Mul};
 
     use crate::{
-        utils::Sum,
         nodes::{LazyNode, Node},
+        utils::Sum,
     };
 
     #[derive(Clone, Copy, Debug, PartialEq)]
@@ -99,6 +99,7 @@ mod tests {
             .fold(Sum::initialize(&0), |acc, new| Sum::combine(&acc, new));
         assert_eq!(result.value(), &500000500000);
     }
+
     #[test]
     fn non_commutative_sum_works() {
         let nodes: Vec<Sum<NonCommutativeTest>> = (0..=1000000)
@@ -111,6 +112,7 @@ mod tests {
             });
         assert_eq!(result.value(), &NonCommutativeTest(1000000));
     }
+
     #[test]
     fn update_lazy_value_works() {
         let mut node = Sum::initialize(&1);
