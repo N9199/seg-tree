@@ -1,6 +1,6 @@
 [package]
 name = "seg-tree"
-version = "0.1.3"
+version = "0.2.0"
 edition = "2021"
 authors = ["N9199 <N9199@users.noreply.github.com>"]
 documentation = "https://docs.rs/seg-tree"
