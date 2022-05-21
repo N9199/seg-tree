@@ -1,0 +1,43 @@
+[package]
+name = "seg-tree-fuzz"
+version = "0.0.0"
+authors = ["Automatically generated"]
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = { version = "0.4.0", features = ["arbitrary-derive"] }
+
+[dependencies.seg-tree]
+path = ".."
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "fuzz_seg_tree_queries"
+path = "fuzz_targets/fuzz_seg_tree_queries.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_utils_sum"
+path = "fuzz_targets/fuzz_utils_sum.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_utils_min"
+path = "fuzz_targets/fuzz_utils_min.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_utils_max"
+path = "fuzz_targets/fuzz_utils_max.rs"
+test = false
+doc = false
