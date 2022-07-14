@@ -2,6 +2,7 @@ use crate::nodes::{LazyNode, Node, PersistentNode};
 
 /// A simple wrapper for nodes to easily implement [PersistentNode]. If the wrapped node implements [LazyNode] the wrapper also implements it.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct PersistentWrapper<T>
 where
     T: Node,

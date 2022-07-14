@@ -2,6 +2,7 @@ use crate::nodes::Node;
 
 /// Implementation of range max for generic type T, it only implements [Node].
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature="arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Max<T> {
     value: T,
 }

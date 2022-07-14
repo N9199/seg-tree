@@ -1,3 +1,6 @@
+#[cfg(feature = "arbitrary")]
+use arbitrary::Arbitrary;
+
 use crate::nodes::{LazyNode, Node, PersistentNode};
 
 /// A wrapper for nodes to easily implement [LazyNode] with an update which sets the range to a value. If the wrapped node implements [PersistentNode] the wrapper also implements it.
@@ -8,6 +11,20 @@ where
 {
     node: T,
     lazy_value: Option<<T as Node>::Value>,
+}
+
+#[cfg(feature = "arbitrary")]
+impl<'a, T> Arbitrary<'a> for LazySetWrapper<T>
+where
+    T: Arbitrary<'a> + Node,
+{
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let node = u.arbitrary()?;
+        Ok(Self {
+            node,
+            lazy_value: None,
+        })
+    }
 }
 
 impl<T> std::fmt::Debug for LazySetWrapper<T>

@@ -13,14 +13,15 @@ libfuzzer-sys = { version = "0.4.0", features = ["arbitrary-derive"] }
 
 [dependencies.seg-tree]
 path = ".."
+features = ["arbitrary"]
 
 # Prevent this from interfering with workspaces
 [workspace]
 members = ["."]
 
 [[bin]]
-name = "fuzz_seg_tree_queries"
-path = "fuzz_targets/fuzz_seg_tree_queries.rs"
+name = "fuzz_seg_tree_recursive_queries"
+path = "fuzz_targets/fuzz_seg_tree_recursive_queries.rs"
 test = false
 doc = false
 
@@ -39,5 +40,17 @@ doc = false
 [[bin]]
 name = "fuzz_utils_max"
 path = "fuzz_targets/fuzz_utils_max.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_seg_tree_iterative_queries"
+path = "fuzz_targets/fuzz_seg_tree_iterative_queries.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_seg_tree_lazy_queries"
+path = "fuzz_targets/fuzz_seg_tree_lazy_queries.rs"
 test = false
 doc = false

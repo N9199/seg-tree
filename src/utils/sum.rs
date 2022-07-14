@@ -1,15 +1,29 @@
+#[cfg(feature = "arbitrary")]
+use arbitrary::{Arbitrary, Result, Unstructured};
+
 use std::ops::{Add, Mul};
 
 use crate::nodes::{LazyNode, Node};
 
 /// Implementation of range sum for generic type T, it implements [Node] and [LazyNode], as such it can be used as a node in every segment tree type.
 #[derive(Clone, Debug)]
-pub struct Sum<T>
-where
-    T: Add<Output = T> + Clone,
-{
+pub struct Sum<T> {
     value: T,
     lazy_value: Option<T>,
+}
+
+#[cfg(feature = "arbitrary")]
+impl<'a, T> Arbitrary<'a> for Sum<T>
+where
+    T: Arbitrary<'a>,
+{
+    fn arbitrary(u: &mut Unstructured<'a>) -> Result<Self> {
+        let value = u.arbitrary()?;
+        Ok(Self {
+            value,
+            lazy_value: None,
+        })
+    }
 }
 
 impl<T> Node for Sum<T>
