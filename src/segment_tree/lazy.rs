@@ -19,6 +19,9 @@ impl<T: LazyNode + Clone> LazySegmentTree<T> {
             }
         }
         let mut out = Self { nodes, n };
+        if n == 0 {
+            return out;
+        }
         out.build_helper(0, 0, n - 1, values);
         out
     }
@@ -155,12 +158,7 @@ impl<T: LazyNode + Clone> LazySegmentTree<T> {
     /// [^note]: A prefix is a segment of the form `[0,i]`.
     ///
     /// [^note2]: Given two prefixes `u` and `v` if `u` is contained in `v` then `predicate(u.value(), value)` implies `predicate(v.value(), value)`.
-    pub fn lower_bound<F, G>(
-        &self,
-        predicate: F,
-        g: G,
-        value: <T as Node>::Value,
-    ) -> usize
+    pub fn lower_bound<F, G>(&self, predicate: F, g: G, value: <T as Node>::Value) -> usize
     where
         F: Fn(&<T as Node>::Value, &<T as Node>::Value) -> bool,
         G: Fn(&<T as Node>::Value, <T as Node>::Value) -> <T as Node>::Value,
@@ -198,15 +196,20 @@ impl<T: LazyNode + Clone> LazySegmentTree<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{nodes::Node, utils::Min};
+    use crate::{
+        nodes::Node,
+        utils::{LazySetWrapper, Min},
+    };
 
     use super::LazySegmentTree;
     // TODO Add more tests
 
+    type LSMin<T> = LazySetWrapper<Min<T>>;
+
     #[test]
     fn build_works() {
         let n = 16;
-        let nodes: Vec<Min<usize>> = (0..n).map(|x| Min::initialize(&x)).collect();
+        let nodes: Vec<LSMin<usize>> = (0..n).map(|x| LSMin::initialize(&x)).collect();
         let mut segment_tree = LazySegmentTree::build(&nodes);
         for i in 0..n {
             let temp = segment_tree.query(i, i).unwrap();
@@ -215,19 +218,19 @@ mod tests {
     }
     #[test]
     fn non_empty_query_returns_some() {
-        let nodes: Vec<Min<usize>> = (0..10).map(|x| Min::initialize(&x)).collect();
+        let nodes: Vec<LSMin<usize>> = (0..10).map(|x| LSMin::initialize(&x)).collect();
         let mut segment_tree = LazySegmentTree::build(&nodes);
         assert!(segment_tree.query(0, 9).is_some());
     }
     #[test]
     fn empty_query_returns_none() {
-        let nodes: Vec<Min<usize>> = (0..10).map(|x| Min::initialize(&x)).collect();
+        let nodes: Vec<LSMin<usize>> = (0..10).map(|x| LSMin::initialize(&x)).collect();
         let mut segment_tree = LazySegmentTree::build(&nodes);
         assert!(segment_tree.query(10, 0).is_none());
     }
     #[test]
     fn update_works() {
-        let nodes: Vec<Min<usize>> = (0..10).map(|x| Min::initialize(&x)).collect();
+        let nodes: Vec<LSMin<usize>> = (0..10).map(|x| LSMin::initialize(&x)).collect();
         let mut segment_tree = LazySegmentTree::build(&nodes);
         let value = 20;
         segment_tree.update(0, 9, value);
@@ -235,7 +238,7 @@ mod tests {
     }
     #[test]
     fn query_works() {
-        let nodes: Vec<Min<usize>> = (0..10).map(|x| Min::initialize(&x)).collect();
+        let nodes: Vec<LSMin<usize>> = (0..10).map(|x| LSMin::initialize(&x)).collect();
         let mut segment_tree = LazySegmentTree::build(&nodes);
         assert_eq!(segment_tree.query(1, 9).unwrap().value(), &1);
     }
