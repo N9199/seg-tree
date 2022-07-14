@@ -21,6 +21,9 @@ where
             roots: Vec::with_capacity(1),
             n,
         };
+        if n == 0 {
+            return temp;
+        }
         let root = temp.build_helper(values, 0, n - 1);
         temp.roots.push(root);
         temp
