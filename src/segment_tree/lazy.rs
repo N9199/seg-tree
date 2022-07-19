@@ -144,8 +144,17 @@ impl<T: LazyNode + Clone> LazySegmentTree<T> {
     /// ```
     /// The second is finding the position of the smallest value greater or equal to some value.
     /// ```
+<<<<<<< HEAD
     /// # use seg_tree::{segment_tree::LazySegmentTree,utils::{Max,LazySetWrapper},nodes::Node};
     /// # type LSMax<T> = LazySetWrapper<Max<T>>;
+=======
+<<<<<<< HEAD
+    /// # use seg_tree::{segment_tree::LazySegmentTree,default::Max,nodes::Node};
+=======
+    /// # use seg_tree::{segment_tree::LazySegmentTree,utils::{Max,LazySetWrapper},nodes::Node};
+    /// # type LSMax<T> = LazySetWrapper<Max<T>>;
+>>>>>>> 019bb64 (Fix doctests on lazy segment trees)
+>>>>>>> 82028da (Fix doctests on lazy segment trees)
     /// let predicate = |left_value:&usize, value:&usize|{*left_value>=*value}; // Is the maximum greater or equal to value?
     /// let g = |_left_node:&usize,value:usize|{value}; // Do nothing
     /// # let nodes: Vec<LSMax<usize>> = (0..10).map(|x| LSMax::initialize(&x)).collect();
