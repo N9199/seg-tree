@@ -161,8 +161,8 @@ where
     /// ```
     /// The second is finding the position of the smallest value greater or equal to some value.
     /// ```
-    /// # use seg_tree::{segment_tree::LazyPersistentSegmentTree,utils::{Max, PersistentWrapper},nodes::Node};
-    /// # type PMax<T> = PersistentWrapper<Max<T>>;
+    /// # use seg_tree::{segment_tree::LazyPersistentSegmentTree,utils::{Max, PersistentWrapper, LazySetWrapper},nodes::Node};
+    /// # type PMax<T> = PersistentWrapper<LazySetWrapper<Max<T>>>;
     /// let predicate = |left_value:&usize, value:&usize|{*left_value>=*value}; // Is the maximum greater or equal to value?
     /// let g = |_left_node:&usize,value:usize|{value}; // Do nothing
     /// # let nodes: Vec<PMax<usize>> = (0..10).map(|x| PMax::initialize(&x)).collect();
