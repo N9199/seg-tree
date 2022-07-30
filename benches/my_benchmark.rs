@@ -6,7 +6,7 @@ use criterion::{
     black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput,
 };
 use rand::{distributions::Uniform, prelude::Distribution};
-use seg_tree::{nodes::Node, segment_tree::*};
+use seg_tree::{nodes::Node, *};
 mod iterative {
     use seg_tree::nodes::Node;
 
@@ -42,7 +42,7 @@ pub fn segment_tree_queries_benchmark(c: &mut Criterion) {
         for j in 1..10 {
             let n = j * 10_usize.pow(i);
             let nodes: Vec<_> = (0..=n).map(|x| iterative::Min::initialize(&x)).collect();
-            let segment_tree = SegmentTree::build(&nodes);
+            let segment_tree = Iterative::build(&nodes);
             let distr = Uniform::from(0..n);
             let mut rng = rand::thread_rng();
             group.throughput(Throughput::Elements(n as u64));

@@ -18,6 +18,7 @@
 /// Node traits.
 pub mod nodes;
 /// Segment trees.
-pub mod segment_tree;
+mod segment_tree;
+pub use segment_tree::*;
 /// Provided node implementations.
 pub mod utils;
