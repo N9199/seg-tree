@@ -2,11 +2,11 @@ use std::ops::{Add, Mul};
 
 use crate::nodes::{LazyNode, Node};
 
-/// Implementation of range sum for generic type T, it implements [Node] and [LazyNode], as such it can be used as a node in every segment tree type.
+/// Implementation of range sum for generic type T, it implements [`Node`] and [`LazyNode`], as such it can be used as a node in every segment tree type.
 #[derive(Clone, Debug)]
 pub struct Sum<T>
 where
-    T: Add<Output = T> + Clone,
+    T: Add<Output = T>,
 {
     value: T,
     lazy_value: Option<T>,
@@ -18,19 +18,22 @@ where
 {
     type Value = T;
     /// The node is initialized with the value given.
+    #[inline]
     fn initialize(v: &Self::Value) -> Self {
-        Sum {
+        Self {
             value: v.clone(),
             lazy_value: None,
         }
     }
     /// As this is a range sum node, the operation which is used to 'merge' two nodes is `+`.
+    #[inline]
     fn combine(a: &Self, b: &Self) -> Self {
-        Sum {
+        Self {
             value: a.value.clone() + b.value.clone(),
             lazy_value: None,
         }
     }
+    #[inline]
     fn value(&self) -> &Self::Value {
         &self.value
     }
@@ -57,7 +60,7 @@ where
             self.lazy_value = Some(new_value.clone());
         }
     }
-
+    #[inline]
     fn lazy_value(&self) -> Option<&<Self as Node>::Value> {
         self.lazy_value.as_ref()
     }
@@ -93,16 +96,16 @@ mod tests {
 
     #[test]
     fn sum_works() {
-        let nodes: Vec<Sum<usize>> = (0..=1000000).map(|x| Sum::initialize(&x)).collect();
+        let nodes: Vec<Sum<usize>> = (0..=1_000_000).map(|x| Sum::initialize(&x)).collect();
         let result = nodes
             .iter()
             .fold(Sum::initialize(&0), |acc, new| Sum::combine(&acc, new));
-        assert_eq!(result.value(), &500000500000);
+        assert_eq!(result.value(), &500_000_500_000);
     }
 
     #[test]
     fn non_commutative_sum_works() {
-        let nodes: Vec<Sum<NonCommutativeTest>> = (0..=1000000)
+        let nodes: Vec<Sum<NonCommutativeTest>> = (0..=1_000_000)
             .map(|x| Sum::initialize(&NonCommutativeTest(x)))
             .collect();
         let result = nodes
@@ -110,7 +113,7 @@ mod tests {
             .fold(Sum::initialize(&NonCommutativeTest(0)), |acc, new| {
                 Sum::combine(&acc, new)
             });
-        assert_eq!(result.value(), &NonCommutativeTest(1000000));
+        assert_eq!(result.value(), &NonCommutativeTest(1_000_000));
     }
 
     #[test]

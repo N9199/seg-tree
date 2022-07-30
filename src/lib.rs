@@ -9,8 +9,12 @@
 //! This library provides simple and easy to use segment trees and some variations of them, by simply implementing certain traits. It also gives some already implemented nodes types, which serve can also serve as examples.
 //!
 //! <br>
-
+#![warn(clippy::all)]
+#![warn(clippy::pedantic)]
+#![warn(clippy::cargo)]
+#![warn(clippy::nursery)]
 #![warn(missing_docs)]
+
 /// Node traits.
 pub mod nodes;
 /// Segment trees.

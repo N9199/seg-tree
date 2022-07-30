@@ -1,6 +1,6 @@
 use crate::nodes::Node;
 
-/// Implementation of the solution to the maximum subarray problem. It just implements [Node].
+/// Implementation of the solution to the maximum subarray problem. It just implements [`Node`].
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct MaxSubArraySum {
     max_sum: i64,
@@ -13,7 +13,7 @@ impl Node for MaxSubArraySum {
     type Value = i64;
     fn initialize(value: &Self::Value) -> Self {
         let v = value.to_owned();
-        MaxSubArraySum {
+        Self {
             max_sum: v,
             max_prefix_sum: v,
             max_suffix_sum: v,
@@ -21,7 +21,7 @@ impl Node for MaxSubArraySum {
         }
     }
     fn combine(a: &Self, b: &Self) -> Self {
-        MaxSubArraySum {
+        Self {
             max_sum: a
                 .max_sum
                 .max(b.max_sum)
@@ -45,14 +45,14 @@ mod tests {
     #[test]
     fn max_sub_array_sum_works() {
         let mut rng = thread_rng();
-        let n = 1000000 / 2;
+        let n = 1_000_000 / 2;
         let mut nodes: Vec<_> = (-n..=n).collect();
         nodes.shuffle(&mut rng);
         // See https://en.wikipedia.org/wiki/Maximum_subarray_problem#Kadane's_algorithm
         let expected_answer = {
             let mut best_sum = 0;
             let mut current_sum = 0;
-            for val in nodes.iter() {
+            for val in &nodes {
                 current_sum = 0.max(current_sum + val);
                 best_sum = best_sum.max(current_sum);
             }

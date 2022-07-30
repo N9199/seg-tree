@@ -2,7 +2,9 @@
 
 use std::time::Duration;
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput, BatchSize};
+use criterion::{
+    black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput,
+};
 use rand::{distributions::Uniform, prelude::Distribution};
 use seg_tree::{nodes::Node, segment_tree::*};
 mod iterative {
@@ -46,7 +48,11 @@ pub fn segment_tree_queries_benchmark(c: &mut Criterion) {
             group.throughput(Throughput::Elements(n as u64));
             group.warm_up_time(Duration::from_secs(1));
             group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, &n| {
-                b.iter_batched(||{distr.sample(&mut rng)},|mut i| segment_tree.query(i, i), BatchSize::SmallInput);
+                b.iter_batched(
+                    || distr.sample(&mut rng),
+                    |mut i| segment_tree.query(i, i),
+                    BatchSize::SmallInput,
+                );
             });
         }
     }

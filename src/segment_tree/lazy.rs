@@ -2,12 +2,12 @@ use crate::nodes::{LazyNode, Node};
 
 /// Lazy segment tree with range queries and range updates.
 /// It uses `O(n)` space, assuming that each node uses `O(1)` space.
-pub struct LazySegmentTree<T: LazyNode> {
+pub struct Lazy<T: LazyNode> {
     nodes: Vec<T>,
     n: usize,
 }
 
-impl<T: LazyNode + Clone> LazySegmentTree<T> {
+impl<T: LazyNode + Clone> Lazy<T> {
     /// Builds lazy segment tree from slice, each element of the slice will correspond to a leaf of the segment tree.
     /// It has time complexity of `O(n*log(n))`, assuming that [combine](Node::combine) has constant time complexity.
     pub fn build(values: &[T]) -> Self {
@@ -53,9 +53,9 @@ impl<T: LazyNode + Clone> LazySegmentTree<T> {
 
     /// Updates the range `[i,j]` with value.
     /// It will panic if `i` or `j` is not in `[0,n]`.
-    /// It has time complexity of `O(log(n))`, assuming that [combine](Node::combine), [update_lazy_value](LazyNode::update_lazy_value) and [lazy_update](LazyNode::lazy_update) have constant time complexity.
-    pub fn update(&mut self, i: usize, j: usize, value: <T as Node>::Value) {
-        self.update_helper(i, j, &value, 0, 0, self.n - 1);
+    /// It has time complexity of `O(log(n))`, assuming that [combine](Node::combine), [`update_lazy_value`](LazyNode::update_lazy_value) and [`lazy_update`](LazyNode::lazy_update) have constant time complexity.
+    pub fn update(&mut self, i: usize, j: usize, value: &<T as Node>::Value) {
+        self.update_helper(i, j, value, 0, 0, self.n - 1);
     }
 
     fn update_helper(
@@ -89,7 +89,7 @@ impl<T: LazyNode + Clone> LazySegmentTree<T> {
     /// Returns the result from the range `[left,right]`.
     /// It returns None if and only if range is empty.
     /// It will **panic** if `left` or `right` are not in [0,n).
-    /// It has time complexity of `O(log(n))`, assuming that [combine](Node::combine), [update_lazy_value](LazyNode::update_lazy_value) and [lazy_update](LazyNode::lazy_update) have constant time complexity.
+    /// It has time complexity of `O(log(n))`, assuming that [combine](Node::combine), [`update_lazy_value`](LazyNode::update_lazy_value) and [`lazy_update`](LazyNode::lazy_update) have constant time complexity.
     pub fn query(&mut self, left: usize, right: usize) -> Option<T> {
         self.query_helper(left, right, 0, 0, self.n - 1)
     }
@@ -144,17 +144,8 @@ impl<T: LazyNode + Clone> LazySegmentTree<T> {
     /// ```
     /// The second is finding the position of the smallest value greater or equal to some value.
     /// ```
-<<<<<<< HEAD
     /// # use seg_tree::{segment_tree::LazySegmentTree,utils::{Max,LazySetWrapper},nodes::Node};
     /// # type LSMax<T> = LazySetWrapper<Max<T>>;
-=======
-<<<<<<< HEAD
-    /// # use seg_tree::{segment_tree::LazySegmentTree,default::Max,nodes::Node};
-=======
-    /// # use seg_tree::{segment_tree::LazySegmentTree,utils::{Max,LazySetWrapper},nodes::Node};
-    /// # type LSMax<T> = LazySetWrapper<Max<T>>;
->>>>>>> 019bb64 (Fix doctests on lazy segment trees)
->>>>>>> 82028da (Fix doctests on lazy segment trees)
     /// let predicate = |left_value:&usize, value:&usize|{*left_value>=*value}; // Is the maximum greater or equal to value?
     /// let g = |_left_node:&usize,value:usize|{value}; // Do nothing
     /// # let nodes: Vec<LSMax<usize>> = (0..10).map(|x| LSMax::initialize(&x)).collect();
@@ -211,7 +202,7 @@ mod tests {
         utils::{LazySetWrapper, Min},
     };
 
-    use super::LazySegmentTree;
+    use super::Lazy;
     // TODO Add more tests
 
     type LSMin<T> = LazySetWrapper<Min<T>>;
@@ -220,7 +211,7 @@ mod tests {
     fn build_works() {
         let n = 16;
         let nodes: Vec<LSMin<usize>> = (0..n).map(|x| LSMin::initialize(&x)).collect();
-        let mut segment_tree = LazySegmentTree::build(&nodes);
+        let mut segment_tree = Lazy::build(&nodes);
         for i in 0..n {
             let temp = segment_tree.query(i, i).unwrap();
             assert_eq!(temp.value(), &i);
@@ -229,27 +220,27 @@ mod tests {
     #[test]
     fn non_empty_query_returns_some() {
         let nodes: Vec<LSMin<usize>> = (0..10).map(|x| LSMin::initialize(&x)).collect();
-        let mut segment_tree = LazySegmentTree::build(&nodes);
+        let mut segment_tree = Lazy::build(&nodes);
         assert!(segment_tree.query(0, 9).is_some());
     }
     #[test]
     fn empty_query_returns_none() {
         let nodes: Vec<LSMin<usize>> = (0..10).map(|x| LSMin::initialize(&x)).collect();
-        let mut segment_tree = LazySegmentTree::build(&nodes);
+        let mut segment_tree = Lazy::build(&nodes);
         assert!(segment_tree.query(10, 0).is_none());
     }
     #[test]
     fn update_works() {
         let nodes: Vec<LSMin<usize>> = (0..10).map(|x| LSMin::initialize(&x)).collect();
-        let mut segment_tree = LazySegmentTree::build(&nodes);
+        let mut segment_tree = Lazy::build(&nodes);
         let value = 20;
-        segment_tree.update(0, 9, value);
+        segment_tree.update(0, 9, &value);
         assert_eq!(segment_tree.query(0, 1).unwrap().value(), &value);
     }
     #[test]
     fn query_works() {
         let nodes: Vec<LSMin<usize>> = (0..10).map(|x| LSMin::initialize(&x)).collect();
-        let mut segment_tree = LazySegmentTree::build(&nodes);
+        let mut segment_tree = Lazy::build(&nodes);
         assert_eq!(segment_tree.query(1, 9).unwrap().value(), &1);
     }
 }
