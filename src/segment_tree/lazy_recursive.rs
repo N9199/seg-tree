@@ -2,12 +2,12 @@ use crate::nodes::{LazyNode, Node};
 
 /// Lazy segment tree with range queries and range updates.
 /// It uses `O(n)` space, assuming that each node uses `O(1)` space.
-pub struct Lazy<T: LazyNode> {
+pub struct LazyRecursive<T: LazyNode> {
     nodes: Vec<T>,
     n: usize,
 }
 
-impl<T: LazyNode + Clone> Lazy<T> {
+impl<T: LazyNode + Clone> LazyRecursive<T> {
     /// Builds lazy segment tree from slice, each element of the slice will correspond to a leaf of the segment tree.
     /// It has time complexity of `O(n*log(n))`, assuming that [combine](Node::combine) has constant time complexity.
     pub fn build(values: &[T]) -> Self {
@@ -131,11 +131,11 @@ impl<T: LazyNode + Clone> Lazy<T> {
     ///
     /// These are two examples, the first is finding the smallest prefix which sums at least some value.
     /// ```
-    /// # use seg_tree::{segment_tree::LazySegmentTree,utils::Sum,nodes::Node};
+    /// # use seg_tree::{LazyRecursive,utils::Sum,nodes::Node};
     /// let predicate = |left_value:&usize, value:&usize|{*left_value>=*value}; // Is the sum greater or equal to value?
     /// let g = |left_node:&usize,value:usize|{value-*left_node}; // Subtract the sum of the prefix.
     /// # let nodes: Vec<Sum<usize>> = (0..10).map(|x| Sum::initialize(&x)).collect();
-    /// let seg_tree = LazySegmentTree::build(&nodes); // [0,1,2,3,4,5,6,7,8,9] with Sum<usize> nodes
+    /// let seg_tree = LazyRecursive::build(&nodes); // [0,1,2,3,4,5,6,7,8,9] with Sum<usize> nodes
     /// let index = seg_tree.lower_bound(predicate, g, 3); // Will return 2 as sum([0,1,2])>=3
     /// # let sums = vec![0,1,3,6,10,15,21,28,36,45];
     /// # for i in 0..10{
@@ -144,12 +144,12 @@ impl<T: LazyNode + Clone> Lazy<T> {
     /// ```
     /// The second is finding the position of the smallest value greater or equal to some value.
     /// ```
-    /// # use seg_tree::{segment_tree::LazySegmentTree,utils::{Max,LazySetWrapper},nodes::Node};
+    /// # use seg_tree::{LazyRecursive,utils::{Max,LazySetWrapper},nodes::Node};
     /// # type LSMax<T> = LazySetWrapper<Max<T>>;
     /// let predicate = |left_value:&usize, value:&usize|{*left_value>=*value}; // Is the maximum greater or equal to value?
     /// let g = |_left_node:&usize,value:usize|{value}; // Do nothing
     /// # let nodes: Vec<LSMax<usize>> = (0..10).map(|x| LSMax::initialize(&x)).collect();
-    /// let seg_tree = LazySegmentTree::build(&nodes); // [0,1,2,3,4,5,6,7,8,9] with Max<usize> nodes
+    /// let seg_tree = LazyRecursive::build(&nodes); // [0,1,2,3,4,5,6,7,8,9] with Max<usize> nodes
     /// let index = seg_tree.lower_bound(predicate, g, 3); // Will return 3 as 3>=3
     /// # for i in 0..10{
     /// #    assert_eq!(seg_tree.lower_bound(predicate, g, i), i);
@@ -202,7 +202,7 @@ mod tests {
         utils::{LazySetWrapper, Min},
     };
 
-    use super::Lazy;
+    use super::LazyRecursive;
     // TODO Add more tests
 
     type LSMin<T> = LazySetWrapper<Min<T>>;
@@ -211,7 +211,7 @@ mod tests {
     fn build_works() {
         let n = 16;
         let nodes: Vec<LSMin<usize>> = (0..n).map(|x| LSMin::initialize(&x)).collect();
-        let mut segment_tree = Lazy::build(&nodes);
+        let mut segment_tree = LazyRecursive::build(&nodes);
         for i in 0..n {
             let temp = segment_tree.query(i, i).unwrap();
             assert_eq!(temp.value(), &i);
@@ -220,19 +220,19 @@ mod tests {
     #[test]
     fn non_empty_query_returns_some() {
         let nodes: Vec<LSMin<usize>> = (0..10).map(|x| LSMin::initialize(&x)).collect();
-        let mut segment_tree = Lazy::build(&nodes);
+        let mut segment_tree = LazyRecursive::build(&nodes);
         assert!(segment_tree.query(0, 9).is_some());
     }
     #[test]
     fn empty_query_returns_none() {
         let nodes: Vec<LSMin<usize>> = (0..10).map(|x| LSMin::initialize(&x)).collect();
-        let mut segment_tree = Lazy::build(&nodes);
+        let mut segment_tree = LazyRecursive::build(&nodes);
         assert!(segment_tree.query(10, 0).is_none());
     }
     #[test]
     fn update_works() {
         let nodes: Vec<LSMin<usize>> = (0..10).map(|x| LSMin::initialize(&x)).collect();
-        let mut segment_tree = Lazy::build(&nodes);
+        let mut segment_tree = LazyRecursive::build(&nodes);
         let value = 20;
         segment_tree.update(0, 9, &value);
         assert_eq!(segment_tree.query(0, 1).unwrap().value(), &value);
@@ -240,7 +240,7 @@ mod tests {
     #[test]
     fn query_works() {
         let nodes: Vec<LSMin<usize>> = (0..10).map(|x| LSMin::initialize(&x)).collect();
-        let mut segment_tree = Lazy::build(&nodes);
+        let mut segment_tree = LazyRecursive::build(&nodes);
         assert_eq!(segment_tree.query(1, 9).unwrap().value(), &1);
     }
 }
