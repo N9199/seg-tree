@@ -2,13 +2,13 @@ use crate::nodes::{LazyNode, Node, PersistentNode};
 
 /// Lazy persistent segment tree, it saves every version of itself, it has range queries and range updates.
 /// It uses `O(n+q*log(n))` space, where `q` is the amount of updates, and assuming that each node uses `O(1)` space.
-pub struct LazyPersistentSegmentTree<T: PersistentNode + LazyNode> {
+pub struct LazyPersistent<T: PersistentNode + LazyNode> {
     nodes: Vec<T>,
     roots: Vec<usize>,
     n: usize,
 }
 
-impl<T> LazyPersistentSegmentTree<T>
+impl<T> LazyPersistent<T>
 where
     T: PersistentNode + LazyNode + Clone,
 {
@@ -48,7 +48,7 @@ where
     /// Returns the result from the range `[left,right]` from the version of the segment tree.
     /// It returns None if and only if range is empty.
     /// It will **panic** if left or right are not in [0,n), or if version is not in [0,[versions](LazyPersistentSegmentTree::versions)).
-    /// It has time complexity of `O(log(n))`, assuming that [combine](Node::combine), [update_lazy_value](LazyNode::update_lazy_value) and [lazy_update](LazyNode::lazy_update) have constant time complexity.
+    /// It has time complexity of `O(log(n))`, assuming that [combine](Node::combine), [`update_lazy_value`](LazyNode::update_lazy_value) and [`lazy_update`](LazyNode::lazy_update) have constant time complexity.
     pub fn query(&mut self, version: usize, left: usize, right: usize) -> Option<T> {
         self.query_helper(self.roots[version], left, right, 0, self.n - 1)
     }
@@ -102,9 +102,9 @@ where
 
     /// Creates a new segment tree version from version were the p-th element of the segment tree to value T and update the segment tree correspondingly.
     /// It will panic if p is not in `[0,n)`, or if version is not in [0,[versions](LazyPersistentSegmentTree::versions)).
-    /// It has time complexity of `O(log(n))`, assuming that [combine](Node::combine), [update_lazy_value](LazyNode::update_lazy_value) and [lazy_update](LazyNode::lazy_update) have constant time complexity.
-    pub fn update(&mut self, version: usize, left: usize, right: usize, value: <T as Node>::Value) {
-        let new_root = self.update_helper(self.roots[version], left, right, &value, 0, self.n - 1);
+    /// It has time complexity of `O(log(n))`, assuming that [combine](Node::combine), [`update_lazy_value`](LazyNode::update_lazy_value) and [`lazy_update`](LazyNode::lazy_update) have constant time complexity.
+    pub fn update(&mut self, version: usize, left: usize, right: usize, value: &<T as Node>::Value) {
+        let new_root = self.update_helper(self.roots[version], left, right, value, 0, self.n - 1);
         self.roots.push(new_root);
     }
 
@@ -137,6 +137,7 @@ where
     }
 
     /// Return the amount of different versions the current segment tree has.
+    #[allow(clippy::must_use_candidate)]
     pub fn versions(&self) -> usize {
         self.roots.len()
     }
@@ -221,38 +222,38 @@ where
 mod tests {
     use crate::{
         nodes::Node,
-        segment_tree::persistent_lazy::LazyPersistentSegmentTree,
+        segment_tree::lazy_persistent::LazyPersistent,
         utils::{PersistentWrapper, Sum},
     };
     type PSum<T> = PersistentWrapper<Sum<T>>;
     #[test]
     fn non_empty_query_returns_some() {
         let nodes: Vec<PSum<usize>> = (0..=10).map(|x| PSum::initialize(&x)).collect();
-        let mut segment_tree = LazyPersistentSegmentTree::build(&nodes);
+        let mut segment_tree = LazyPersistent::build(&nodes);
         assert!(segment_tree.query(0, 0, 10).is_some());
     }
     #[test]
     fn empty_query_returns_none() {
         let nodes: Vec<PSum<usize>> = (0..=10).map(|x| PSum::initialize(&x)).collect();
-        let mut segment_tree = LazyPersistentSegmentTree::build(&nodes);
+        let mut segment_tree = LazyPersistent::build(&nodes);
         assert!(segment_tree.query(0, 10, 0).is_none());
     }
     #[test]
     fn normal_update_works() {
         let nodes: Vec<PSum<usize>> = (0..=10).map(|x| PSum::initialize(&x)).collect();
-        let mut segment_tree = LazyPersistentSegmentTree::build(&nodes);
+        let mut segment_tree = LazyPersistent::build(&nodes);
         let value = 20;
-        segment_tree.update(0, 0, 0, value);
+        segment_tree.update(0, 0, 0, &value);
         assert_eq!(segment_tree.query(1, 0, 0).unwrap().value(), &value);
     }
 
     #[test]
     fn branched_update_works() {
         let nodes: Vec<PSum<usize>> = (0..=10).map(|x| PSum::initialize(&x)).collect();
-        let mut segment_tree = LazyPersistentSegmentTree::build(&nodes);
+        let mut segment_tree = LazyPersistent::build(&nodes);
         let value = 20;
-        segment_tree.update(0, 0, 10, value);
-        segment_tree.update(0, 1, 1, value);
+        segment_tree.update(0, 0, 10, &value);
+        segment_tree.update(0, 1, 1, &value);
         assert_eq!(segment_tree.query(2, 0, 0).unwrap().value(), &0);
         assert_eq!(segment_tree.query(2, 1, 1).unwrap().value(), &(value + 1));
     }
@@ -260,7 +261,7 @@ mod tests {
     #[test]
     fn query_works() {
         let nodes: Vec<PSum<usize>> = (0..=10).map(|x| PSum::initialize(&x)).collect();
-        let mut segment_tree = LazyPersistentSegmentTree::build(&nodes);
+        let mut segment_tree = LazyPersistent::build(&nodes);
         assert_eq!(segment_tree.query(0, 0, 10).unwrap().value(), &55);
     }
 }

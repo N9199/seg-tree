@@ -1,6 +1,6 @@
 use crate::nodes::Node;
 
-/// Implementation of range max for generic type T, it only implements [Node].
+/// Implementation of range max for generic type T, it only implements [`Node`].
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Max<T> {
     value: T,
@@ -12,10 +12,10 @@ where
 {
     type Value = T;
     fn initialize(v: &Self::Value) -> Self {
-        Max { value: v.clone() }
+        Self { value: v.clone() }
     }
     fn combine(a: &Self, b: &Self) -> Self {
-        Max {
+        Self {
             value: a.value.clone().max(b.value.clone()),
         }
     }
@@ -30,10 +30,10 @@ mod tests {
 
     #[test]
     fn max_works() {
-        let nodes: Vec<Max<usize>> = (0..=1000000).map(|x| Max::initialize(&x)).collect();
+        let nodes: Vec<Max<usize>> = (0..=1_000_000).map(|x| Max::initialize(&x)).collect();
         let result = nodes
             .iter()
             .fold(Max::initialize(&0), |acc, new| Max::combine(&acc, new));
-        assert_eq!(result.value(), &1000000);
+        assert_eq!(result.value(), &1_000_000);
     }
 }

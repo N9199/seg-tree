@@ -1,13 +1,10 @@
 use crate::nodes::Node;
 
-/// Implementation of range min for generic type T, it only implements [Node].
+/// Implementation of range min for generic type T, it only implements [`Node`].
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Min<T>
-{
+pub struct Min<T> {
     value: T,
 }
-
-
 
 impl<T> Node for Min<T>
 where
@@ -15,10 +12,10 @@ where
 {
     type Value = T;
     fn initialize(v: &Self::Value) -> Self {
-        Min { value: v.clone() }
+        Self { value: v.clone() }
     }
     fn combine(a: &Self, b: &Self) -> Self {
-        Min {
+        Self {
             value: a.value.clone().min(b.value.clone()),
         }
     }
@@ -32,7 +29,7 @@ mod tests {
 
     #[test]
     fn min_works() {
-        let nodes: Vec<Min<usize>> = (0..=1000000).map(|x| Min::initialize(&x)).collect();
+        let nodes: Vec<Min<usize>> = (0..=1_000_000).map(|x| Min::initialize(&x)).collect();
         let result = nodes
             .iter()
             .fold(Min::initialize(&0), |acc, new| Min::combine(&acc, new));

@@ -1,10 +1,10 @@
 mod iterative;
 mod lazy;
 mod persistent;
-mod persistent_lazy;
+mod lazy_persistent;
 mod recursive;
 
 pub use self::{
-    iterative::SegmentTree, lazy::LazySegmentTree, persistent::PersistentSegmentTree,
-    persistent_lazy::LazyPersistentSegmentTree, recursive::RecursiveSegmentTree,
+    iterative::SegmentTree, lazy::Lazy, persistent::Persistent,
+    lazy_persistent::LazyPersistent, recursive::Recursive,
 };

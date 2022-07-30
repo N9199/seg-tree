@@ -2,7 +2,7 @@ use crate::nodes::Node;
 
 /// Segment tree with range queries and point updates.
 /// It uses `O(n)` space, assuming that each node uses `O(1)` space.
-/// Note if you need to use `lower_bound`, just use the [RecursiveSegmentTree](crate::segment_tree::RecursiveSegmentTree) it uses double the memory though and it's less performant.
+/// Note if you need to use `lower_bound`, just use the [`RecursiveSegmentTree`](crate::segment_tree::RecursiveSegmentTree) it uses double the memory though and it's less performant.
 pub struct SegmentTree<T: Node + Clone> {
     nodes: Vec<T>,
     n: usize,
@@ -31,10 +31,10 @@ where
     /// Sets the i-th element of the segment tree to value T and update the segment tree correspondingly.
     /// It will panic if i is not in `[0,n)`
     /// It has time complexity of `O(log(n))`, assuming that [combine](Node::combine) has constant time complexity.
-    pub fn update(&mut self, i: usize, value: <T as Node>::Value) {
+    pub fn update(&mut self, i: usize, value: &<T as Node>::Value) {
         let mut i = i;
         i += self.n;
-        self.nodes[i] = Node::initialize(&value);
+        self.nodes[i] = Node::initialize(value);
         while i > 0 {
             i >>= 1;
             self.nodes[i] = Node::combine(&self.nodes[2 * i], &self.nodes[2 * i + 1]);
@@ -45,6 +45,7 @@ where
     /// It returns None if and only if range is empty.
     /// It will **panic** if left or right are not in `[0,n)`.
     /// It has time complexity of `O(log(n))`, assuming that [combine](Node::combine) has constant time complexity.
+    #[allow(clippy::must_use_candidate)]
     pub fn query(&self, l: usize, r: usize) -> Option<T> {
         let (mut l, mut r) = (l, r);
         let mut ans_left = None;
@@ -100,7 +101,7 @@ mod tests {
         let nodes: Vec<Min<usize>> = (0..=10).map(|x| Min::initialize(&x)).collect();
         let mut segment_tree = SegmentTree::build(&nodes);
         let value = 20;
-        segment_tree.update(0, value);
+        segment_tree.update(0, &value);
         assert_eq!(segment_tree.query(0, 0).unwrap().value(), &value);
     }
     #[test]

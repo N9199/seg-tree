@@ -1,5 +1,5 @@
 use super::Node;
-/// Required trait by nodes of persistent segment trees. It's essentially a trait needed for the internals of the persistent segment trees, unless you have special requirements just use [PersistentWrapper](crate::utils::PersistentWrapper).
+/// Required trait by nodes of persistent segment trees. It's essentially a trait needed for the internals of the persistent segment trees, unless you have special requirements just use [`PersistentWrapper`](crate::utils::PersistentWrapper).
 pub trait PersistentNode: Node {
     /// Gives index of left child.
     fn left_child(&self) -> usize;
