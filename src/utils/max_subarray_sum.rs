@@ -38,16 +38,17 @@ impl Node for MaxSubArraySum {
 
 #[cfg(test)]
 mod tests {
-    use rand::{prelude::SliceRandom, thread_rng};
+    use rand::{distributions::Uniform, thread_rng, prelude::Distribution};
 
     use crate::{nodes::Node, utils::MaxSubArraySum};
 
+    const N: usize = 1_000;
+
     #[test]
     fn max_sub_array_sum_works() {
+        let random = Uniform::from((i64::MIN / (N as i64))..(i64::MAX / (N as i64)));
         let mut rng = thread_rng();
-        let n = 1_000_000 / 2;
-        let mut nodes: Vec<_> = (-n..=n).collect();
-        nodes.shuffle(&mut rng);
+        let nodes: Vec<i64> = random.sample_iter(&mut rng).take(N).collect();
         // See https://en.wikipedia.org/wiki/Maximum_subarray_problem#Kadane's_algorithm
         let expected_answer = {
             let mut best_sum = 0;

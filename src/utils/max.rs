@@ -30,10 +30,11 @@ mod tests {
 
     #[test]
     fn max_works() {
-        let nodes: Vec<Max<usize>> = (0..=1_000_000).map(|x| Max::initialize(&x)).collect();
+        const N: usize = 1_000;
+        let nodes: Vec<Max<usize>> = (0..=N).map(|x| Max::initialize(&x)).collect();
         let result = nodes
             .iter()
             .fold(Max::initialize(&0), |acc, new| Max::combine(&acc, new));
-        assert_eq!(result.value(), &1_000_000);
+        assert_eq!(result.value(), &N);
     }
 }

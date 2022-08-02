@@ -40,7 +40,7 @@ where
         let right_node = self.build_helper(values, mid + 1, j);
         let curr_node = self.nodes.len();
         self.nodes
-            .push(T::combine(&self.nodes[left_node], &self.nodes[right_node]));
+            .push(Node::combine(&self.nodes[left_node], &self.nodes[right_node]));
         self.nodes[curr_node].set_children(left_node, right_node);
         curr_node
     }
@@ -93,7 +93,7 @@ where
             self.query_helper(left_node, left, right, i, mid),
             self.query_helper(right_node, left, right, mid + 1, j),
         ) {
-            (Some(ans_left), Some(ans_right)) => Some(T::combine(&ans_left, &ans_right)),
+            (Some(ans_left), Some(ans_right)) => Some(Node::combine(&ans_left, &ans_right)),
             (Some(ans_left), None) => Some(ans_left),
             (None, Some(ans_right)) => Some(ans_right),
             (None, None) => None,

@@ -76,7 +76,7 @@ mod tests {
     };
 
     #[derive(Clone, Copy, Debug, PartialEq)]
-    struct NonCommutativeTest(u64);
+    struct NonCommutativeTest(usize);
     /// It satisfies a+b==b
     impl Add for NonCommutativeTest {
         type Output = Self;
@@ -94,18 +94,20 @@ mod tests {
         }
     }
 
+    const N: usize = 1_000;
+
     #[test]
     fn sum_works() {
-        let nodes: Vec<Sum<usize>> = (0..=1_000_000).map(|x| Sum::initialize(&x)).collect();
+        let nodes: Vec<Sum<usize>> = (0..=N).map(|x| Sum::initialize(&x)).collect();
         let result = nodes
             .iter()
             .fold(Sum::initialize(&0), |acc, new| Sum::combine(&acc, new));
-        assert_eq!(result.value(), &500_000_500_000);
+        assert_eq!(result.value(), &((N+1)*N/2));
     }
 
     #[test]
     fn non_commutative_sum_works() {
-        let nodes: Vec<Sum<NonCommutativeTest>> = (0..=1_000_000)
+        let nodes: Vec<Sum<NonCommutativeTest>> = (0..=N)
             .map(|x| Sum::initialize(&NonCommutativeTest(x)))
             .collect();
         let result = nodes
@@ -113,7 +115,7 @@ mod tests {
             .fold(Sum::initialize(&NonCommutativeTest(0)), |acc, new| {
                 Sum::combine(&acc, new)
             });
-        assert_eq!(result.value(), &NonCommutativeTest(1_000_000));
+        assert_eq!(result.value(), &NonCommutativeTest(N));
     }
 
     #[test]

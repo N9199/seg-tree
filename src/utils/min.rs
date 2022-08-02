@@ -29,7 +29,8 @@ mod tests {
 
     #[test]
     fn min_works() {
-        let nodes: Vec<Min<usize>> = (0..=1_000_000).map(|x| Min::initialize(&x)).collect();
+        const N: usize = 1_000;
+        let nodes: Vec<Min<usize>> = (0..=N).map(|x| Min::initialize(&x)).collect();
         let result = nodes
             .iter()
             .fold(Min::initialize(&0), |acc, new| Min::combine(&acc, new));

@@ -36,7 +36,7 @@ impl<T: LazyNode + Clone> LazyRecursive<T> {
         let right_node = 2 * curr_node + 2;
         self.build_helper(left_node, i, mid, values);
         self.build_helper(right_node, mid + 1, j, values);
-        self.nodes[curr_node] = T::combine(&self.nodes[left_node], &self.nodes[right_node]);
+        self.nodes[curr_node] = Node::combine(&self.nodes[left_node], &self.nodes[right_node]);
     }
 
     fn push(&mut self, u: usize, i: usize, j: usize) {
@@ -83,7 +83,7 @@ impl<T: LazyNode + Clone> LazyRecursive<T> {
         let right_node = 2 * curr_node + 2;
         self.update_helper(left, right, value, left_node, i, mid);
         self.update_helper(left, right, value, right_node, mid + 1, j);
-        self.nodes[curr_node] = T::combine(&self.nodes[left_node], &self.nodes[right_node]);
+        self.nodes[curr_node] = Node::combine(&self.nodes[left_node], &self.nodes[right_node]);
     }
 
     /// Returns the result from the range `[left,right]`.
@@ -118,7 +118,7 @@ impl<T: LazyNode + Clone> LazyRecursive<T> {
             self.query_helper(left, right, left_node, i, mid),
             self.query_helper(left, right, right_node, mid + 1, j),
         ) {
-            (Some(ans_left), Some(ans_right)) => Some(T::combine(&ans_left, &ans_right)),
+            (Some(ans_left), Some(ans_right)) => Some(Node::combine(&ans_left, &ans_right)),
             (Some(ans_left), None) => Some(ans_left),
             (None, Some(ans_right)) => Some(ans_right),
             (None, None) => None,
