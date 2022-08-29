@@ -1,3 +1,5 @@
+use core::mem::MaybeUninit;
+
 use crate::nodes::{LazyNode, Node};
 
 /// Lazy segment tree with range queries and range updates.
@@ -12,31 +14,42 @@ impl<T: LazyNode + Clone> LazyRecursive<T> {
     /// It has time complexity of `O(n*log(n))`, assuming that [combine](Node::combine) has constant time complexity.
     pub fn build(values: &[T]) -> Self {
         let n = values.len();
-        let mut nodes = Vec::with_capacity(4 * n);
-        for _ in 0..4 {
-            for v in values {
-                nodes.push(v.clone());
-            }
-        }
-        let mut out = Self { nodes, n };
         if n == 0 {
-            return out;
+            return Self {
+                nodes: Vec::new(),
+                n,
+            };
         }
-        out.build_helper(0, 0, n - 1, values);
-        out
+        let mut nodes = Vec::with_capacity(4 * n);
+        unsafe { nodes.set_len(4 * n) };
+        Self::build_helper(0, 0, n - 1, values, &mut nodes);
+        let ptr = nodes.as_mut_ptr();
+        core::mem::forget(nodes);
+        let nodes = unsafe { Vec::from_raw_parts(ptr.cast::<T>(), 4 * n, 4 * n) };
+        Self { nodes, n }
     }
 
-    fn build_helper(&mut self, curr_node: usize, i: usize, j: usize, values: &[T]) {
+    fn build_helper(
+        curr_node: usize,
+        i: usize,
+        j: usize,
+        values: &[T],
+        nodes: &mut [MaybeUninit<T>],
+    ) {
         if i == j {
-            self.nodes[curr_node] = values[i].clone();
+            nodes[curr_node].write(values[i].clone());
             return;
         }
         let mid = (i + j) / 2;
         let left_node = 2 * curr_node + 1;
         let right_node = 2 * curr_node + 2;
-        self.build_helper(left_node, i, mid, values);
-        self.build_helper(right_node, mid + 1, j, values);
-        self.nodes[curr_node] = Node::combine(&self.nodes[left_node], &self.nodes[right_node]);
+        Self::build_helper(left_node, i, mid, values, nodes);
+        Self::build_helper(right_node, mid + 1, j, values, nodes);
+        let (top_nodes, bottom_nodes) = nodes.split_at_mut(curr_node + 1);
+        top_nodes[curr_node].write(Node::combine(
+            unsafe { bottom_nodes[left_node - curr_node - 1].assume_init_ref() },
+            unsafe { bottom_nodes[right_node - curr_node - 1].assume_init_ref() },
+        ));
     }
 
     fn push(&mut self, u: usize, i: usize, j: usize) {
@@ -203,7 +216,6 @@ mod tests {
     };
 
     use super::LazyRecursive;
-    // TODO Add more tests
 
     type LSMin<T> = LazySetWrapper<Min<T>>;
 

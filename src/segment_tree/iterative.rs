@@ -1,9 +1,11 @@
+use core::mem::MaybeUninit;
+
 use crate::nodes::Node;
 
 /// Segment tree with range queries and point updates.
 /// It uses `O(n)` space, assuming that each node uses `O(1)` space.
 /// Note if you need to use `lower_bound`, just use the [`RecursiveSegmentTree`](crate::segment_tree::RecursiveSegmentTree) it uses double the memory though and it's less performant.
-pub struct Iterative<T: Node + Clone> {
+pub struct Iterative<T> {
     nodes: Vec<T>,
     n: usize,
 }
@@ -16,15 +18,21 @@ where
     /// It has time complexity of `O(n*log(n))`, assuming that [combine](Node::combine) has constant time complexity.
     pub fn build(values: &[T]) -> Self {
         let n = values.len();
-        let mut nodes = Vec::with_capacity(2 * n);
-        for _ in 0..2 {
-            for v in values {
-                nodes.push(v.clone());
-            }
+        let mut nodes: Vec<MaybeUninit<T>> = Vec::with_capacity(2 * n);
+        unsafe { nodes.set_len(2 * n) };
+        for i in 0..n {
+            nodes[i + n].write(values[i].clone());
         }
-        (1..n).rev().for_each(|i| {
-            nodes[i] = Node::combine(&nodes[2 * i], &nodes[2 * i + 1]);
-        });
+        for i in (1..n).rev() {
+            let (bottom_nodes, top_nodes) = nodes.split_at_mut(i + 1);
+            bottom_nodes[i].write(Node::combine(
+                unsafe { top_nodes[i - 1].assume_init_ref() },
+                unsafe { top_nodes[i].assume_init_ref() },
+            ));
+        }
+        let ptr = nodes.as_mut_ptr();
+        core::mem::forget(nodes);
+        let nodes = unsafe { Vec::from_raw_parts(ptr.cast(), 2 * n, 2 * n) };
         Self { nodes, n }
     }
 
@@ -35,9 +43,10 @@ where
         let mut i = i;
         i += self.n;
         self.nodes[i] = Node::initialize(value);
+        i >>= 1;
         while i > 0 {
-            i >>= 1;
             self.nodes[i] = Node::combine(&self.nodes[2 * i], &self.nodes[2 * i + 1]);
+            i >>= 1;
         }
     }
 
@@ -78,6 +87,7 @@ where
         }
     }
 }
+
 #[cfg(test)]
 mod tests {
     use crate::{nodes::Node, utils::Min};
@@ -108,6 +118,8 @@ mod tests {
     fn query_works() {
         let nodes: Vec<Min<usize>> = (0..=10).map(|x| Min::initialize(&x)).collect();
         let segment_tree = Iterative::build(&nodes);
-        assert_eq!(segment_tree.query(1, 10).unwrap().value(), &1);
+        for i in 0..10 {
+            assert_eq!(segment_tree.query(i, 10).unwrap().value(), &i);
+        }
     }
 }
