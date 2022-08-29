@@ -1,12 +1,10 @@
 mod iterative;
+mod lazy_persistent;
 mod lazy_recursive;
 mod persistent;
-mod lazy_persistent;
 mod recursive;
-mod recursive2;
-
 
 pub use self::{
-    iterative::Iterative, lazy_recursive::LazyRecursive, persistent::Persistent,
-    lazy_persistent::LazyPersistent, recursive::Recursive, recursive2::Recursive as Recursive2
+    iterative::Iterative, lazy_persistent::LazyPersistent, lazy_recursive::LazyRecursive,
+    persistent::Persistent, recursive::Recursive,
 };

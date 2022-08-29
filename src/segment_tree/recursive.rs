@@ -1,9 +1,11 @@
+use std::mem::MaybeUninit;
+
 use crate::nodes::Node;
 
 /// Segment tree with range queries and point updates.
 /// It uses `O(n)` space, assuming that each node uses `O(1)` space.
 /// Note if you don't need to use `lower_bound`, just use the [`SegmentTree`](crate::segment_tree::SegmentTree) it uses half the memory and it's more performant.
-pub struct Recursive<T: Node + Clone> {
+pub struct Recursive<T> {
     nodes: Vec<T>,
     n: usize,
 }
@@ -14,34 +16,47 @@ where
 {
     /// Builds segment tree from slice, each element of the slice will correspond to a leaf of the segment tree.
     /// It has time complexity of `O(n*log(n))`, assuming that [combine](Node::combine) has constant time complexity.
+    #[must_use]
     pub fn build(values: &[T]) -> Self {
         let n = values.len();
         let mut nodes = Vec::with_capacity(4 * n);
-        for _ in 0..4 {
-            for v in values {
-                nodes.push(v.clone());
-            }
-        }
-        let mut out = Self { nodes, n };
+        unsafe { nodes.set_len(4 * n) };
         if n == 0 {
-            return out;
+            return Self {
+                nodes: Vec::new(),
+                n: 0,
+            };
         }
-        out.build_helper(0, 0, n - 1, values);
-        out
+        Self::build_helper(0, 0, n - 1, values, &mut nodes);
+        let ptr = nodes.as_mut_ptr();
+        core::mem::forget(nodes);
+        let nodes = unsafe { Vec::from_raw_parts(ptr.cast::<T>(), 4 * n, 4 * n) }; // Unsafe AF, but if it's coded correctly the only nodes which will ever be accessed are already initialized
+
+        Self { nodes, n }
     }
 
     #[inline]
-    fn build_helper(&mut self, curr_node: usize, i: usize, j: usize, values: &[T]) {
+    fn build_helper(
+        curr_node: usize,
+        i: usize,
+        j: usize,
+        values: &[T],
+        nodes: &mut [MaybeUninit<T>],
+    ) {
         if i == j {
-            self.nodes[curr_node] = values[i].clone();
+            nodes[curr_node].write(values[i].clone());
             return;
         }
         let mid = (i + j) / 2;
         let left_node = 2 * curr_node + 1;
         let right_node = 2 * curr_node + 2;
-        self.build_helper(left_node, i, mid, values);
-        self.build_helper(right_node, mid + 1, j, values);
-        self.nodes[curr_node] = T::combine(&self.nodes[left_node], &self.nodes[right_node]);
+        Self::build_helper(left_node, i, mid, values, nodes);
+        Self::build_helper(right_node, mid + 1, j, values, nodes);
+        let (top_nodes, bottom_nodes) = nodes.split_at_mut(curr_node + 1);
+        top_nodes[curr_node].write(Node::combine(
+            unsafe { bottom_nodes[left_node - curr_node - 1].assume_init_ref() },
+            unsafe { bottom_nodes[right_node - curr_node - 1].assume_init_ref() },
+        ));
     }
 
     /// Sets the p-th element of the segment tree to value T and update the segment tree correspondingly.
@@ -106,7 +121,7 @@ where
             self.query_helper(left, right, left_node, i, mid),
             self.query_helper(left, right, right_node, mid + 1, j),
         ) {
-            (Some(ans_left), Some(ans_right)) => Some(T::combine(&ans_left, &ans_right)),
+            (Some(ans_left), Some(ans_right)) => Some(Node::combine(&ans_left, &ans_right)),
             (Some(ans_left), None) => Some(ans_left),
             (None, Some(ans_right)) => Some(ans_right),
             (None, None) => None,
@@ -120,8 +135,8 @@ where
     /// These are two examples, the first is finding the smallest prefix which sums at least some value.
     /// ```
     /// # use seg_tree::{Recursive,utils::Sum,nodes::Node};
-    /// let predicate = |left_value:&usize, value:&usize|{*left_value>=*value}; // Is the sum greater or equal to value?
-    /// let g = |left_node:&usize,value:usize|{value-*left_node}; // Subtract the sum of the prefix.
+    /// let predicate = |left_value: &usize, value: &usize|{*left_value >= *value}; // Is the sum greater or equal to value?
+    /// let g = |left_node: &usize, value: usize|{value - *left_node}; // Subtract the sum of the prefix.
     /// # let nodes: Vec<Sum<usize>> = (0..10).map(|x| Sum::initialize(&x)).collect();
     /// let seg_tree = Recursive::build(&nodes); // [0,1,2,3,4,5,6,7,8,9] with Sum<usize> nodes
     /// let index = seg_tree.lower_bound(predicate, g, 3); // Will return 2 as sum([0,1,2])>=3
@@ -181,6 +196,7 @@ where
         }
     }
 }
+
 #[cfg(test)]
 mod tests {
     use crate::{nodes::Node, utils::Min};
