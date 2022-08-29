@@ -121,7 +121,7 @@ where
             self.query_helper(left, right, left_node, i, mid),
             self.query_helper(left, right, right_node, mid + 1, j),
         ) {
-            (Some(ans_left), Some(ans_right)) => Some(T::combine(&ans_left, &ans_right)),
+            (Some(ans_left), Some(ans_right)) => Some(Node::combine(&ans_left, &ans_right)),
             (Some(ans_left), None) => Some(ans_left),
             (None, Some(ans_right)) => Some(ans_right),
             (None, None) => None,
