@@ -201,11 +201,11 @@ pub fn lazy_recursive_segment_tree_updates_benchmark(c: &mut Criterion) {
 }
 
 criterion_group!(
-    benches,
+    my_benchmark,
     recursive_segment_tree_queries_benchmark,
     iterative_segment_tree_queries_benchmark,
     lazy_recursive_segment_tree_queries_benchmark,
     recursive_segment_tree_updates_benchmark,
     iterative_segment_tree_updates_benchmark
 );
-criterion_main!(benches);
+criterion_main!(my_benchmark);

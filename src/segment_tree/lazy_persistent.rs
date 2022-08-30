@@ -103,7 +103,13 @@ where
     /// Creates a new segment tree version from version were the p-th element of the segment tree to value T and update the segment tree correspondingly.
     /// It will panic if p is not in `[0,n)`, or if version is not in [0,[versions](LazyPersistentSegmentTree::versions)).
     /// It has time complexity of `O(log(n))`, assuming that [combine](Node::combine), [`update_lazy_value`](LazyNode::update_lazy_value) and [`lazy_update`](LazyNode::lazy_update) have constant time complexity.
-    pub fn update(&mut self, version: usize, left: usize, right: usize, value: &<T as Node>::Value) {
+    pub fn update(
+        &mut self,
+        version: usize,
+        left: usize,
+        right: usize,
+        value: &<T as Node>::Value,
+    ) {
         let new_root = self.update_helper(self.roots[version], left, right, value, 0, self.n - 1);
         self.roots.push(new_root);
     }

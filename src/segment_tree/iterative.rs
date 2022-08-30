@@ -1,6 +1,6 @@
 use core::mem::MaybeUninit;
 
-use crate::nodes::Node;
+use crate::{internal_utils::as_dbg_tree, nodes::Node};
 
 /// Segment tree with range queries and point updates.
 /// It uses `O(n)` space, assuming that each node uses `O(1)` space.
@@ -85,6 +85,41 @@ where
             (None, Some(ans_right)) => Some(Node::initialize(ans_right.value())),
             (None, None) => None,
         }
+    }
+}
+
+impl<T> Iterative<T>
+where
+    T: Node + core::fmt::Debug,
+{
+    fn dbg_visitor<'a>(n: usize, f: &mut dyn FnMut(usize, usize, &'a T), nodes: &'a [T]) {
+        let mut segments = vec![(0, 0); 2 * n];
+        for i in 0..n {
+            segments[i + n] = (i, i);
+            f(i, i, &nodes[n + i]);
+        }
+        let helper = |(a1, b1): (usize, usize), (a2, b2)| (a1.min(a2), b1.max(b2));
+        for i in (1..n).rev() {
+            segments[i] = helper(segments[2 * i], segments[2 * i + 1]);
+            f(segments[i].0, segments[i].1, &nodes[i]);
+        }
+    }
+}
+
+impl<T> core::fmt::Debug for Iterative<T>
+where
+    T: Node + core::fmt::Debug,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Recursive")
+            .field("n", &self.n)
+            .field(
+                "nodes",
+                &as_dbg_tree(&self.nodes, |nodes, f| {
+                    Self::dbg_visitor(self.n, f, nodes);
+                }),
+            )
+            .finish()
     }
 }
 

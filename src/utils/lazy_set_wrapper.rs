@@ -27,12 +27,12 @@ impl<T> Node for LazySetWrapper<T>
 where
     T: Node,
 {
-    type Value = T::Value;
+    type Value = <T as Node>::Value;
 
     #[inline]
     fn initialize(value: &Self::Value) -> Self {
         Self {
-            node: T::initialize(value),
+            node: Node::initialize(value),
             lazy_value: None,
         }
     }
@@ -40,7 +40,7 @@ where
     #[inline]
     fn combine(a: &Self, b: &Self) -> Self {
         Self {
-            node: T::combine(&a.node, &b.node),
+            node: Node::combine(&a.node, &b.node),
             lazy_value: None,
         }
     }

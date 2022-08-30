@@ -1,6 +1,6 @@
 use std::mem::MaybeUninit;
 
-use crate::nodes::Node;
+use crate::{nodes::Node, internal_utils::as_dbg_tree};
 
 /// Segment tree with range queries and point updates.
 /// It uses `O(n)` space, assuming that each node uses `O(1)` space.
@@ -194,6 +194,44 @@ where
             let value = g(left_value, value);
             self.lower_bound_helper(right_node, mid + 1, j, predicate, g, value)
         }
+    }
+}
+
+impl<T> Recursive<T>
+where
+    T: core::fmt::Debug,
+{
+    fn dbg_visitor<'a>(
+        curr_node: usize,
+        i: usize,
+        j: usize,
+        f: &mut dyn FnMut(usize, usize, &'a T),
+        nodes: &'a [T],
+    ) {
+        f(i, j, &nodes[curr_node]);
+        if i == j {
+            return;
+        }
+        let mid = (i + j) / 2;
+        Self::dbg_visitor(2 * curr_node + 1, i, mid, f, nodes);
+        Self::dbg_visitor(2 * curr_node + 2, mid + 1, j, f, nodes);
+    }
+}
+
+impl<T> core::fmt::Debug for Recursive<T>
+where
+    T: core::fmt::Debug,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Recursive")
+            .field("n", &self.n)
+            .field(
+                "nodes",
+                &as_dbg_tree(&self.nodes, |nodes, f| {
+                    Self::dbg_visitor(0, 0, self.n - 1, f, nodes);
+                }),
+            )
+            .finish()
     }
 }
 
