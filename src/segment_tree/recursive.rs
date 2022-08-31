@@ -1,10 +1,13 @@
 use std::mem::MaybeUninit;
 
-use crate::{nodes::Node, internal_utils::as_dbg_tree};
+use crate::{
+    internal_utils::dbg_utils::{as_dbg_tree, recursive_visitor},
+    nodes::Node,
+};
 
 /// Segment tree with range queries and point updates.
 /// It uses `O(n)` space, assuming that each node uses `O(1)` space.
-/// Note if you don't need to use `lower_bound`, just use the [`SegmentTree`](crate::segment_tree::SegmentTree) it uses half the memory and it's more performant.
+/// Note if you don't need to use `lower_bound`, just use [`Iterative`](crate::segment_tree::Iterative) it uses half the memory and it's more performant.
 pub struct Recursive<T> {
     nodes: Vec<T>,
     n: usize,
@@ -15,7 +18,7 @@ where
     T: Node + Clone,
 {
     /// Builds segment tree from slice, each element of the slice will correspond to a leaf of the segment tree.
-    /// It has time complexity of `O(n*log(n))`, assuming that [combine](Node::combine) has constant time complexity.
+    /// It has time complexity of `O(n*log(n))`, assuming that [`combine`](Node::combine) has constant time complexity.
     #[must_use]
     pub fn build(values: &[T]) -> Self {
         let n = values.len();
@@ -61,7 +64,7 @@ where
 
     /// Sets the p-th element of the segment tree to value T and update the segment tree correspondingly.
     /// It will panic if p is not in `[0,n)`
-    /// It has time complexity of `O(log(n))`, assuming that [combine](Node::combine) has constant time complexity.
+    /// It has time complexity of `O(log(n))`, assuming that [`combine`](Node::combine) has constant time complexity.
     pub fn update(&mut self, p: usize, value: &<T as Node>::Value) {
         self.update_helper(p, value, 0, 0, self.n - 1);
     }
@@ -93,7 +96,7 @@ where
     /// Returns the result from the range `[left,right]`.
     /// It returns None if and only if range is empty.
     /// It will **panic** if `left` or `right` are not in [0,n).
-    /// It has time complexity of `O(log(n))`, assuming that [combine](Node::combine) has constant time complexity.
+    /// It has time complexity of `O(log(n))`, assuming that [`combine`](Node::combine) has constant time complexity.
     #[allow(clippy::must_use_candidate)]
     pub fn query(&self, left: usize, right: usize) -> Option<T> {
         self.query_helper(left, right, 0, 0, self.n - 1)
@@ -197,27 +200,6 @@ where
     }
 }
 
-impl<T> Recursive<T>
-where
-    T: core::fmt::Debug,
-{
-    fn dbg_visitor<'a>(
-        curr_node: usize,
-        i: usize,
-        j: usize,
-        f: &mut dyn FnMut(usize, usize, &'a T),
-        nodes: &'a [T],
-    ) {
-        f(i, j, &nodes[curr_node]);
-        if i == j {
-            return;
-        }
-        let mid = (i + j) / 2;
-        Self::dbg_visitor(2 * curr_node + 1, i, mid, f, nodes);
-        Self::dbg_visitor(2 * curr_node + 2, mid + 1, j, f, nodes);
-    }
-}
-
 impl<T> core::fmt::Debug for Recursive<T>
 where
     T: core::fmt::Debug,
@@ -228,7 +210,7 @@ where
             .field(
                 "nodes",
                 &as_dbg_tree(&self.nodes, |nodes, f| {
-                    Self::dbg_visitor(0, 0, self.n - 1, f, nodes);
+                    recursive_visitor(0, 0, self.n - 1, f, nodes);
                 }),
             )
             .finish()
@@ -266,5 +248,15 @@ mod tests {
         let nodes: Vec<Min<usize>> = (0..=10).map(|x| Min::initialize(&x)).collect();
         let segment_tree = Recursive::build(&nodes);
         assert_eq!(segment_tree.query(1, 10).unwrap().value(), &1);
+    }
+
+    #[test]
+    fn dbg_works(){
+        let nodes: Vec<Min<usize>> = (0..=10).map(|x| Min::initialize(&x)).collect();
+        let mut segment_tree = Recursive::build(&nodes);
+        segment_tree.update(0, &2);
+        let dbg = format!("{segment_tree:?}");
+        let expected = "Recursive { n: 11, nodes: {[0, 10]: Min { value: 1 }, [0, 5]: Min { value: 1 }, [0, 2]: Min { value: 1 }, [0, 1]: Min { value: 1 }, [0, 0]: Min { value: 2 }, [1, 1]: Min { value: 1 }, [2, 2]: Min { value: 2 }, [3, 5]: Min { value: 3 }, [3, 4]: Min { value: 3 }, [3, 3]: Min { value: 3 }, [4, 4]: Min { value: 4 }, [5, 5]: Min { value: 5 }, [6, 10]: Min { value: 6 }, [6, 8]: Min { value: 6 }, [6, 7]: Min { value: 6 }, [6, 6]: Min { value: 6 }, [7, 7]: Min { value: 7 }, [8, 8]: Min { value: 8 }, [9, 10]: Min { value: 9 }, [9, 9]: Min { value: 9 }, [10, 10]: Min { value: 10 }} }";
+        assert_eq!(dbg, expected);
     }
 }
