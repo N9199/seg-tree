@@ -13,9 +13,13 @@ exclude = [
 ]
 
 [dev-dependencies]
-criterion = { version = "0.3.6", features = ["html_reports"] }
+criterion = { version = "0.3", features = ["html_reports"] }
 rand = "0.8.5"
 
 [[bench]]
 harness = false
 name = "my_benchmark"
+
+[dependencies]
+bit-vec = { version = "0.6.3", default-features = false }
+

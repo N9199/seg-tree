@@ -1,6 +1,6 @@
-use crate::nodes::{LazyNode, Node, PersistentNode};
+use crate::nodes::{LazyNode, Node};
 
-/// A wrapper for nodes to easily implement [`LazyNode`] with an update which sets the range to a value. If the wrapped node implements [`PersistentNode`] the wrapper also implements it.
+/// A wrapper for nodes to easily implement [`LazyNode`] with an update which sets the range to a value.
 #[derive(Clone)]
 pub struct LazySetWrapper<T>
 where
@@ -27,12 +27,12 @@ impl<T> Node for LazySetWrapper<T>
 where
     T: Node,
 {
-    type Value = T::Value;
+    type Value = <T as Node>::Value;
 
     #[inline]
     fn initialize(value: &Self::Value) -> Self {
         Self {
-            node: T::initialize(value),
+            node: Node::initialize(value),
             lazy_value: None,
         }
     }
@@ -40,7 +40,7 @@ where
     #[inline]
     fn combine(a: &Self, b: &Self) -> Self {
         Self {
-            node: T::combine(&a.node, &b.node),
+            node: Node::combine(&a.node, &b.node),
             lazy_value: None,
         }
     }
@@ -69,24 +69,6 @@ where
         self.lazy_value.as_ref()
     }
 }
-impl<T> PersistentNode for LazySetWrapper<T>
-where
-    T: PersistentNode,
-{
-    #[inline]
-    fn left_child(&self) -> usize {
-        self.node.left_child()
-    }
-    #[inline]
-    fn right_child(&self) -> usize {
-        self.node.right_child()
-    }
-    #[inline]
-    fn set_children(&mut self, left: usize, right: usize) {
-        self.node.set_children(left, right);
-    }
-}
-
 impl<T> From<T> for LazySetWrapper<T>
 where
     T: Node,

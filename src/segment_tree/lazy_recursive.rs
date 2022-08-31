@@ -1,17 +1,20 @@
 use core::mem::MaybeUninit;
 
-use crate::nodes::{LazyNode, Node};
+use crate::{
+    internal_utils::dbg_utils::{as_dbg_tree, recursive_visitor},
+    nodes::{LazyNode, Node},
+};
 
 /// Lazy segment tree with range queries and range updates.
 /// It uses `O(n)` space, assuming that each node uses `O(1)` space.
-pub struct LazyRecursive<T: LazyNode> {
+pub struct LazyRecursive<T> {
     nodes: Vec<T>,
     n: usize,
 }
 
 impl<T: LazyNode + Clone> LazyRecursive<T> {
     /// Builds lazy segment tree from slice, each element of the slice will correspond to a leaf of the segment tree.
-    /// It has time complexity of `O(n*log(n))`, assuming that [combine](Node::combine) has constant time complexity.
+    /// It has time complexity of `O(n*log(n))`, assuming that [`combine`](Node::combine) has constant time complexity.
     pub fn build(values: &[T]) -> Self {
         let n = values.len();
         if n == 0 {
@@ -65,8 +68,8 @@ impl<T: LazyNode + Clone> LazyRecursive<T> {
     }
 
     /// Updates the range `[i,j]` with value.
-    /// It will panic if `i` or `j` is not in `[0,n]`.
-    /// It has time complexity of `O(log(n))`, assuming that [combine](Node::combine), [`update_lazy_value`](LazyNode::update_lazy_value) and [`lazy_update`](LazyNode::lazy_update) have constant time complexity.
+    /// It will panic if `i` or `j` is not in `[0,n)`.
+    /// It has time complexity of `O(log(n))`, assuming that [`combine`](Node::combine), [`update_lazy_value`](LazyNode::update_lazy_value) and [`lazy_update`](LazyNode::lazy_update) have constant time complexity.
     pub fn update(&mut self, i: usize, j: usize, value: &<T as Node>::Value) {
         self.update_helper(i, j, value, 0, 0, self.n - 1);
     }
@@ -101,8 +104,8 @@ impl<T: LazyNode + Clone> LazyRecursive<T> {
 
     /// Returns the result from the range `[left,right]`.
     /// It returns None if and only if range is empty.
-    /// It will **panic** if `left` or `right` are not in [0,n).
-    /// It has time complexity of `O(log(n))`, assuming that [combine](Node::combine), [`update_lazy_value`](LazyNode::update_lazy_value) and [`lazy_update`](LazyNode::lazy_update) have constant time complexity.
+    /// It will **panic** if `left` or `right` are not in `[0,n)`.
+    /// It has time complexity of `O(log(n))`, assuming that [`combine`](Node::combine), [`update_lazy_value`](LazyNode::update_lazy_value) and [`lazy_update`](LazyNode::lazy_update) have constant time complexity.
     pub fn query(&mut self, left: usize, right: usize) -> Option<T> {
         self.query_helper(left, right, 0, 0, self.n - 1)
     }
@@ -208,6 +211,22 @@ impl<T: LazyNode + Clone> LazyRecursive<T> {
     }
 }
 
+impl<T> core::fmt::Debug for LazyRecursive<T>
+where
+    T: core::fmt::Debug,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("LazyRecursive")
+            .field("n", &self.n)
+            .field(
+                "nodes",
+                &as_dbg_tree(&self.nodes, |nodes, f| {
+                    recursive_visitor(0, 0, self.n - 1, f, nodes);
+                }),
+            )
+            .finish()
+    }
+}
 #[cfg(test)]
 mod tests {
     use crate::{
@@ -254,5 +273,15 @@ mod tests {
         let nodes: Vec<LSMin<usize>> = (0..10).map(|x| LSMin::initialize(&x)).collect();
         let mut segment_tree = LazyRecursive::build(&nodes);
         assert_eq!(segment_tree.query(1, 9).unwrap().value(), &1);
+    }
+
+    #[test]
+    fn dbg_works() {
+        let nodes: Vec<LSMin<usize>> = (0..=10).map(|x| LSMin::initialize(&x)).collect();
+        let mut segment_tree = LazyRecursive::build(&nodes);
+        segment_tree.update(0, 1, &2);
+        let dbg = format!("{segment_tree:?}");
+        let expected = "LazyRecursive { n: 11, nodes: {[0, 10]: LazySetWrapper { node: Min { value: 2 }, lazy_value: None }, [0, 5]: LazySetWrapper { node: Min { value: 2 }, lazy_value: None }, [0, 2]: LazySetWrapper { node: Min { value: 2 }, lazy_value: None }, [0, 1]: LazySetWrapper { node: Min { value: 2 }, lazy_value: None }, [0, 0]: LazySetWrapper { node: Min { value: 0 }, lazy_value: Some(2) }, [1, 1]: LazySetWrapper { node: Min { value: 1 }, lazy_value: Some(2) }, [2, 2]: LazySetWrapper { node: Min { value: 2 }, lazy_value: None }, [3, 5]: LazySetWrapper { node: Min { value: 3 }, lazy_value: None }, [3, 4]: LazySetWrapper { node: Min { value: 3 }, lazy_value: None }, [3, 3]: LazySetWrapper { node: Min { value: 3 }, lazy_value: None }, [4, 4]: LazySetWrapper { node: Min { value: 4 }, lazy_value: None }, [5, 5]: LazySetWrapper { node: Min { value: 5 }, lazy_value: None }, [6, 10]: LazySetWrapper { node: Min { value: 6 }, lazy_value: None }, [6, 8]: LazySetWrapper { node: Min { value: 6 }, lazy_value: None }, [6, 7]: LazySetWrapper { node: Min { value: 6 }, lazy_value: None }, [6, 6]: LazySetWrapper { node: Min { value: 6 }, lazy_value: None }, [7, 7]: LazySetWrapper { node: Min { value: 7 }, lazy_value: None }, [8, 8]: LazySetWrapper { node: Min { value: 8 }, lazy_value: None }, [9, 10]: LazySetWrapper { node: Min { value: 9 }, lazy_value: None }, [9, 9]: LazySetWrapper { node: Min { value: 9 }, lazy_value: None }, [10, 10]: LazySetWrapper { node: Min { value: 10 }, lazy_value: None }} }";
+        assert_eq!(dbg, expected);
     }
 }
