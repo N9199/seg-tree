@@ -14,12 +14,12 @@
 #![warn(clippy::cargo)]
 #![warn(clippy::nursery)]
 #![warn(missing_docs)]
-
+#![cfg_attr(any(doc, docsrs), feature(doc_cfg))]
 /// Node traits.
 pub mod nodes;
 /// Segment trees.
 mod segment_tree;
 pub use segment_tree::*;
+mod internal_utils;
 /// Provided node implementations.
 pub mod utils;
-mod internal_utils;

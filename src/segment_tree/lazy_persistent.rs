@@ -9,6 +9,7 @@ use crate::{
 };
 
 /// Lazy persistent segment tree, it saves every version of itself, it has range queries and range updates.
+///
 /// It uses `O(n+q*log(n))` space, where `q` is the amount of updates, and assuming that each node uses `O(1)` space.
 pub struct LazyPersistent<T> {
     nodes: Vec<PersistentWrapper<T>>,
@@ -43,7 +44,7 @@ where
             self.nodes.push(values[i].clone().into());
             return curr_node;
         }
-        let mid = (i + j) / 2;
+        let mid = usize::midpoint(i, j);
         let left_node = self.build_helper(values, i, mid);
         let right_node = self.build_helper(values, mid + 1, j);
         let curr_node = self.nodes.len();
@@ -57,7 +58,7 @@ where
 
     /// Returns the result from the range `[left,right]` from the version of the segment tree.
     /// It returns None if and only if range is empty.
-    /// It will **panic** if left or right are not in `[0,n)`, or if version is not in `[0,`[`versions`](Self::versions)`)`.
+    /// It will **panic** if left or right are not in `[0,n)`, or if version is not in <code>[0,[versions](Self::versions))</code>.
     /// It has time complexity of `O(log(n))`, assuming that [`combine`](Node::combine), [`update_lazy_value`](LazyNode::update_lazy_value) and [`lazy_update`](LazyNode::lazy_update) have constant time complexity.
     pub fn query(&mut self, version: usize, left: usize, right: usize) -> Option<T> {
         self.query_helper(self.roots[version], left, right, 0, self.n - 1)
@@ -108,7 +109,7 @@ where
         if left <= i && j <= right {
             return Some(self.nodes[curr_node].clone());
         }
-        let mid = (i + j) / 2;
+        let mid = usize::midpoint(i, j);
         let left_node = self.nodes[curr_node].left_child().unwrap().get();
         let right_node = self.nodes[curr_node].right_child().unwrap().get();
         match (
@@ -123,7 +124,7 @@ where
     }
 
     /// Creates a new segment tree version from version were the p-th element of the segment tree to value T and update the segment tree correspondingly.
-    /// It will panic if p is not in `[0,n)`, or if version is not in `[0,`[`versions`](Self::versions)`)`.
+    // It will panic if p is not in `[0,n)`, or if version is not in <code>[0,[versions](Self::versions))</code>
     /// It has time complexity of `O(log(n))`, assuming that [`combine`](Node::combine), [`update_lazy_value`](LazyNode::update_lazy_value) and [`lazy_update`](LazyNode::lazy_update) have constant time complexity.
     pub fn update(
         &mut self,
@@ -155,7 +156,7 @@ where
             self.push(x, i, j);
             return x;
         }
-        let mid = (i + j) / 2;
+        let mid = usize::midpoint(i, j);
         let left_node = self.update_helper(
             self.nodes[x].left_child().unwrap().get(),
             left,
@@ -177,9 +178,9 @@ where
         x
     }
 
-    /// Returns the amount of different versions the current segment tree has. Essentially this will be how many calls to [`update`](Self::update) have happened. 
+    /// Returns the amount of different versions the current segment tree has. Essentially this will be how many calls to [`update`](Self::update) have happened.
     #[allow(clippy::must_use_candidate)]
-    pub fn versions(&self) -> usize {
+    pub const fn versions(&self) -> usize {
         self.roots.len()
     }
 
@@ -246,7 +247,7 @@ where
         if i == j {
             return i;
         }
-        let mid = (i + j) / 2;
+        let mid = usize::midpoint(i, j);
         let left_node = if let Some(l) = self.nodes[curr_node].left_child() {
             l.get()
         } else {

@@ -1,6 +1,7 @@
 use super::Node;
 
 /// Required trait by nodes of lazy segment trees.
+///
 /// It's defined as an interface for the operations needed on the `lazy_value`.
 /// It is recommended to implement it using an Option type.
 /// See [Implementors](LazyNode#implementors) for some example implementations.

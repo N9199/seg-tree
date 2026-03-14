@@ -65,7 +65,7 @@ pub fn recursive_visitor<'a, T>(
     if i == j {
         return;
     }
-    let mid = (i + j) / 2;
+    let mid = usize::midpoint(i, j);
     recursive_visitor(2 * curr_node + 1, i, mid, f, nodes);
     recursive_visitor(2 * curr_node + 2, mid + 1, j, f, nodes);
 }
@@ -85,7 +85,7 @@ pub fn persistent_visitor<'a, 'b, T>(
     if i == j {
         return;
     }
-    let mid = (i + j) / 2;
+    let mid = usize::midpoint(i, j);
     let left_node = nodes[curr_node].left_child().unwrap().get();
     let right_node = nodes[curr_node].right_child().unwrap().get();
     if !visited[left_node] {
@@ -111,7 +111,7 @@ pub fn lazy_persistent_visitor<'a, 'b, T>(
     if i == j {
         return;
     }
-    let mid = (i + j) / 2;
+    let mid = usize::midpoint(i, j);
     if let Some(left_node) = nodes[curr_node].left_child() {
         let left_node = left_node.get();
         if !visited[left_node] {

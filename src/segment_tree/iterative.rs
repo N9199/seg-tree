@@ -3,6 +3,7 @@ use core::mem::MaybeUninit;
 use crate::{internal_utils::dbg_utils::as_dbg_tree, nodes::Node};
 
 /// Segment tree with range queries and point updates.
+///
 /// It uses `O(n)` space, assuming that each node uses `O(1)` space.
 /// Note if you need to use `lower_bound`, just use [`Recursive`](crate::segment_tree::Recursive) it uses double the memory though and it's less performant.
 pub struct Iterative<T> {
@@ -31,8 +32,12 @@ where
             ));
         }
         let ptr = nodes.as_mut_ptr();
+        let len = nodes.len();
+        let cap = nodes.capacity();
+        debug_assert_eq!(len, cap);
+        debug_assert_eq!(len, 2 * n);
         core::mem::forget(nodes);
-        let nodes = unsafe { Vec::from_raw_parts(ptr.cast(), 2 * n, 2 * n) };
+        let nodes = unsafe { Vec::from_raw_parts(ptr.cast(), len, cap) };
         Self { nodes, n }
     }
 
@@ -63,18 +68,18 @@ where
         r += self.n + 1;
         while l < r {
             if l & 1 != 0 {
-                ans_left = Some(match ans_left {
-                    None => Node::initialize(self.nodes[l].value()),
-                    Some(node) => Node::combine(&node, &self.nodes[l]),
-                });
+                ans_left = Some(ans_left.map_or_else(
+                    || Node::initialize(self.nodes[l].value()),
+                    |node| Node::combine(&node, &self.nodes[l]),
+                ));
                 l += 1;
             }
             if r & 1 != 0 {
                 r -= 1;
-                ans_right = Some(match ans_right {
-                    None => Node::initialize(self.nodes[r].value()),
-                    Some(node) => Node::combine(&self.nodes[r], &node),
-                });
+                ans_right = Some(ans_right.map_or_else(
+                    || Node::initialize(self.nodes[r].value()),
+                    |node| Node::combine(&self.nodes[r], &node),
+                ));
             }
             l >>= 1;
             r >>= 1;
@@ -157,7 +162,7 @@ mod tests {
     }
 
     #[test]
-    fn dbg_works(){
+    fn dbg_works() {
         let nodes: Vec<Min<usize>> = (0..=10).map(|x| Min::initialize(&x)).collect();
         let mut segment_tree = Iterative::build(&nodes);
         segment_tree.update(0, &2);
