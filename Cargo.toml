@@ -28,4 +28,7 @@ name = "my_benchmark"
 
 [dependencies]
 bit-vec = { version = "0.6.3", default-features = false }
+bifurcate = {version = "0.1.0", default-features = false, optional = true}
 
+[features]
+bifurcate = ["dep:bifurcate"]
