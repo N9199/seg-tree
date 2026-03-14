@@ -5,7 +5,7 @@ use crate::{
         dbg_utils::{as_dbg_tree, persistent_visitor},
         persistent_utils::PersistentWrapper,
     },
-    nodes::Node,
+    traits::Node,
 };
 
 /// Persistent segment tree, it saves every version of itself, it has range queries and point updates.
@@ -145,7 +145,7 @@ where
     ///
     /// These are two examples, the first is finding the smallest prefix which sums at least some value.
     /// ```
-    /// # use seg_tree::{Persistent,utils::Sum,nodes::Node};
+    /// # use seg_tree::{Persistent,utils::Sum,traits::Node};
     /// let predicate = |left_value:&usize, value:&usize|{*left_value>=*value}; // Is the sum greater or equal to value?
     /// let g = |left_node:&usize,value:usize|{value-*left_node}; // Subtract the sum of the prefix.
     /// # let nodes: Vec<Sum<usize>> = (0..10).map(|x| Sum::initialize(&x)).collect();
@@ -158,7 +158,7 @@ where
     /// ```
     /// The second is finding the position of the smallest value greater or equal to some value.
     /// ```
-    /// # use seg_tree::{Persistent,utils::Max, nodes::Node};
+    /// # use seg_tree::{Persistent,utils::Max, traits::Node};
     /// let predicate = |left_value:&usize, value:&usize|{*left_value>=*value}; // Is the maximum greater or equal to value?
     /// let g = |_left_node:&usize,value:usize|{value}; // Do nothing
     /// # let nodes: Vec<Max<usize>> = (0..10).map(|x| Max::initialize(&x)).collect();
@@ -239,7 +239,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{nodes::Node, segment_tree::Persistent, utils::Sum};
+    use crate::{segment_tree::Persistent, traits::Node, utils::Sum};
+
     #[test]
     fn non_empty_query_returns_some() {
         let nodes: Vec<Sum<usize>> = (0..=10).map(|x| Sum::initialize(&x)).collect();
@@ -285,7 +286,7 @@ mod tests {
         let mut segment_tree = Persistent::build(&nodes);
         segment_tree.update(0, 1, &2);
         let dbg = format!("{segment_tree:?}");
-        let expected = "Persistent { n: 11, nodes: {[0, 10]: Sum { value: 55, lazy_value: None }, [0, 5]: Sum { value: 15, lazy_value: None }, [0, 2]: Sum { value: 3, lazy_value: None }, [0, 1]: Sum { value: 1, lazy_value: None }, [0, 0]: Sum { value: 0, lazy_value: None }, [1, 1]: Sum { value: 1, lazy_value: None }, [2, 2]: Sum { value: 2, lazy_value: None }, [3, 5]: Sum { value: 12, lazy_value: None }, [3, 4]: Sum { value: 7, lazy_value: None }, [3, 3]: Sum { value: 3, lazy_value: None }, [4, 4]: Sum { value: 4, lazy_value: None }, [5, 5]: Sum { value: 5, lazy_value: None }, [6, 10]: Sum { value: 40, lazy_value: None }, [6, 8]: Sum { value: 21, lazy_value: None }, [6, 7]: Sum { value: 13, lazy_value: None }, [6, 6]: Sum { value: 6, lazy_value: None }, [7, 7]: Sum { value: 7, lazy_value: None }, [8, 8]: Sum { value: 8, lazy_value: None }, [9, 10]: Sum { value: 19, lazy_value: None }, [9, 9]: Sum { value: 9, lazy_value: None }, [10, 10]: Sum { value: 10, lazy_value: None }, [0, 10]: Sum { value: 56, lazy_value: None }, [0, 5]: Sum { value: 16, lazy_value: None }, [0, 2]: Sum { value: 4, lazy_value: None }, [0, 1]: Sum { value: 2, lazy_value: None }, [1, 1]: Sum { value: 2, lazy_value: None }} }";
-        assert_eq!(dbg, expected);
+        let expected = "Persistent { n: 11, nodes: {[0, 10]: Sum { value: 55 }, [0, 5]: Sum { value: 15 }, [0, 2]: Sum { value: 3 }, [0, 1]: Sum { value: 1 }, [0, 0]: Sum { value: 0 }, [1, 1]: Sum { value: 1 }, [2, 2]: Sum { value: 2 }, [3, 5]: Sum { value: 12 }, [3, 4]: Sum { value: 7 }, [3, 3]: Sum { value: 3 }, [4, 4]: Sum { value: 4 }, [5, 5]: Sum { value: 5 }, [6, 10]: Sum { value: 40 }, [6, 8]: Sum { value: 21 }, [6, 7]: Sum { value: 13 }, [6, 6]: Sum { value: 6 }, [7, 7]: Sum { value: 7 }, [8, 8]: Sum { value: 8 }, [9, 10]: Sum { value: 19 }, [9, 9]: Sum { value: 9 }, [10, 10]: Sum { value: 10 }, [0, 10]: Sum { value: 56 }, [0, 5]: Sum { value: 16 }, [0, 2]: Sum { value: 4 }, [0, 1]: Sum { value: 2 }, [1, 1]: Sum { value: 2 }} }";
+        pretty_assertions::assert_eq!(dbg, expected);
     }
 }

@@ -1,4 +1,4 @@
-use crate::nodes::Node;
+use crate::traits::Node;
 
 /// Implementation of the solution to the maximum subarray problem. It just implements [`Node`].
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -40,7 +40,7 @@ impl Node for MaxSubArraySum {
 mod tests {
     use rand::{distributions::Uniform, prelude::Distribution, thread_rng};
 
-    use crate::{nodes::Node, utils::MaxSubArraySum};
+    use crate::{traits::Node, utils::MaxSubArraySum};
 
     const N: usize = 1_000;
 

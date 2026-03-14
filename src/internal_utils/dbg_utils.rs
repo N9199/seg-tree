@@ -70,6 +70,7 @@ pub fn recursive_visitor<'a, T>(
     recursive_visitor(2 * curr_node + 2, mid + 1, j, f, nodes);
 }
 
+#[inline]
 pub fn persistent_visitor<'a, 'b, T>(
     curr_node: usize,
     i: usize,

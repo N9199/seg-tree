@@ -1,4 +1,4 @@
-use crate::nodes::Node;
+use crate::traits::Node;
 
 /// Implementation of range min for generic type T, it only implements [`Node`].
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -23,9 +23,10 @@ where
         &self.value
     }
 }
+
 #[cfg(test)]
 mod tests {
-    use crate::{nodes::Node, utils::Min};
+    use crate::{traits::Node, utils::Min};
 
     #[test]
     fn min_works() {

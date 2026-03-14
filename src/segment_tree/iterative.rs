@@ -1,6 +1,6 @@
 use core::mem::MaybeUninit;
 
-use crate::{internal_utils::dbg_utils::as_dbg_tree, nodes::Node};
+use crate::{internal_utils::dbg_utils::as_dbg_tree, traits::Node};
 
 /// Segment tree with range queries and point updates.
 ///
@@ -128,7 +128,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{nodes::Node, utils::Min};
+    use crate::{traits::Node, utils::Min};
 
     use super::Iterative;
 

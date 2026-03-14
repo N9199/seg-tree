@@ -5,6 +5,9 @@ mod min;
 mod sum;
 
 pub use self::{
-    lazy_set_wrapper::LazySetWrapper, max::Max, max_subarray_sum::MaxSubArraySum, min::Min,
-    sum::Sum,
+    lazy_set_wrapper::LazySetWrapper,
+    max::Max,
+    max_subarray_sum::MaxSubArraySum,
+    min::Min,
+    sum::{LazySum, Sum},
 };

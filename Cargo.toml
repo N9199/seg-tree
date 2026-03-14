@@ -20,6 +20,7 @@ rustdoc-args = ["--cfg", "docsrs", "--all-features"]
 
 [dev-dependencies]
 criterion = { version = "0.3", features = ["html_reports"] }
+pretty_assertions = "1.4.1"
 rand = "0.8.5"
 
 [[bench]]

@@ -1,6 +1,6 @@
 use core::num::NonZeroUsize;
 
-use crate::nodes::{LazyNode, Node};
+use crate::traits::{LazyNode, Node};
 
 #[derive(Clone, Copy)]
 pub struct NonNUsize<const N: usize>(NonZeroUsize);
@@ -61,19 +61,18 @@ impl<T> LazyNode for PersistentWrapper<T>
 where
     T: LazyNode,
 {
-    #[inline]
-    fn lazy_update(&mut self, i: usize, j: usize) {
-        self.node.lazy_update(i, j);
+    type Update = <T as LazyNode>::Update;
+
+    fn pending(&mut self) -> Option<&Self::Update> {
+        self.node.pending()
     }
 
-    #[inline]
-    fn update_lazy_value(&mut self, new_value: &<Self as Node>::Value) {
-        self.node.update_lazy_value(new_value);
+    fn defer(&mut self, update: &Self::Update) {
+        self.node.defer(update);
     }
 
-    #[inline]
-    fn lazy_value(&self) -> Option<&<Self as Node>::Value> {
-        self.node.lazy_value()
+    fn apply_pending(&mut self, range: std::range::RangeInclusive<usize>) {
+        self.node.apply_pending(range);
     }
 }
 

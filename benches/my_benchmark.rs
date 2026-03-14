@@ -3,11 +3,11 @@
 use std::time::Duration;
 
 use criterion::{
-    black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput,
+    BatchSize, BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main,
 };
-use rand::{distributions::Uniform, prelude::Distribution, Rng};
+use rand::{Rng, distributions::Uniform, prelude::Distribution};
 use seg_tree::{
-    nodes::Node,
+    traits::Node,
     utils::{LazySetWrapper, Min},
     *,
 };

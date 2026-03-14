@@ -1,4 +1,4 @@
-use crate::nodes::{LazyNode, Node};
+use crate::traits::{LazyNode, Node};
 
 /// A wrapper for nodes to easily implement [`LazyNode`] with an update which sets the range to a value.
 #[derive(Clone)]
@@ -7,7 +7,7 @@ where
     T: Node,
 {
     node: T,
-    lazy_value: Option<<T as Node>::Value>,
+    update: Option<<T as Node>::Value>,
 }
 
 impl<T> std::fmt::Debug for LazySetWrapper<T>
@@ -18,7 +18,7 @@ where
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("LazySetWrapper")
             .field("node", &self.node)
-            .field("lazy_value", &self.lazy_value)
+            .field("lazy_value", &self.update)
             .finish()
     }
 }
@@ -33,7 +33,7 @@ where
     fn initialize(value: &Self::Value) -> Self {
         Self {
             node: Node::initialize(value),
-            lazy_value: None,
+            update: None,
         }
     }
 
@@ -41,7 +41,7 @@ where
     fn combine(a: &Self, b: &Self) -> Self {
         Self {
             node: Node::combine(&a.node, &b.node),
-            lazy_value: None,
+            update: None,
         }
     }
 
@@ -54,19 +54,23 @@ impl<T> LazyNode for LazySetWrapper<T>
 where
     T: Node,
 {
+    type Update = <T as Node>::Value;
+
     #[inline]
-    fn lazy_update(&mut self, _i: usize, _j: usize) {
-        if let Some(value) = self.lazy_value.take() {
+    fn pending(&mut self) -> Option<&Self::Update> {
+        self.update.as_ref()
+    }
+
+    #[inline]
+    fn defer(&mut self, update: &Self::Update) {
+        self.update = Some(update.clone());
+    }
+
+    #[inline]
+    fn apply_pending(&mut self, _range: std::range::RangeInclusive<usize>) {
+        if let Some(value) = self.update.take() {
             self.node = Node::initialize(&value);
         }
-    }
-    #[inline]
-    fn update_lazy_value(&mut self, new_value: &<Self as Node>::Value) {
-        self.lazy_value = Some(new_value.clone());
-    }
-    #[inline]
-    fn lazy_value(&self) -> Option<&<Self as Node>::Value> {
-        self.lazy_value.as_ref()
     }
 }
 impl<T> From<T> for LazySetWrapper<T>
@@ -75,36 +79,35 @@ where
 {
     #[inline]
     fn from(node: T) -> Self {
-        Self {
-            node,
-            lazy_value: None,
-        }
+        Self { node, update: None }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::range::RangeInclusive;
+
     use crate::{
-        nodes::{LazyNode, Node},
+        traits::{LazyNode, Node},
         utils::Min,
     };
 
     use super::LazySetWrapper;
 
-    type LSMin<T> = LazySetWrapper<Min<T>>;
+    type LSMin<T: Clone + Ord> = LazySetWrapper<Min<T>>;
     #[test]
     fn update_lazy_value_works() {
         let mut node = LSMin::initialize(&1);
-        node.update_lazy_value(&2);
-        assert_eq!(node.lazy_value(), Some(&2));
+        node.defer(&2);
+        assert_eq!(node.pending(), Some(&2));
     }
 
     #[test]
     fn lazy_update_works() {
         // Node represents the range [0,10] with min 1.
         let mut node = LSMin::initialize(&1);
-        node.update_lazy_value(&2);
-        node.lazy_update(0, 10);
+        node.defer(&2);
+        node.apply_pending(RangeInclusive { start: 0, last: 10 });
         assert_eq!(node.value(), &2);
     }
 }

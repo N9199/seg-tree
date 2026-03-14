@@ -4,7 +4,7 @@ use core::ops::Range;
 
 use crate::{
     internal_utils::dbg_utils::{as_dbg_tree, recursive_visitor},
-    nodes::Node,
+    traits::Node,
 };
 
 /**
@@ -26,15 +26,15 @@ where
     #[must_use]
     pub fn build(values: &[T]) -> Self {
         let n = values.len();
-        let mut nodes = Vec::with_capacity(4 * n);
-        // SAFETY: As the nodes are of type `MaybeUninit<T>` this is safe.
-        unsafe { nodes.set_len(4 * n) };
         if n == 0 {
             return Self {
                 nodes: Vec::new(),
                 n: 0,
             };
         }
+        let mut nodes = Vec::with_capacity(4 * n);
+        // SAFETY: As the nodes are of type `MaybeUninit<T>` this is safe.
+        unsafe { nodes.set_len(4 * n) };
         Self::build_helper(0, 0, n - 1, values, &mut nodes);
         let ptr = nodes.as_mut_ptr();
         let len = nodes.len();
@@ -307,7 +307,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{nodes::Node, utils::Min};
+    use crate::{traits::Node, utils::Min};
 
     use super::Recursive;
 
@@ -345,7 +345,7 @@ mod tests {
         segment_tree.update(0, &2);
         let dbg = format!("{segment_tree:?}");
         let expected = "Recursive { n: 11, nodes: {[0, 10]: Min { value: 1 }, [0, 5]: Min { value: 1 }, [0, 2]: Min { value: 1 }, [0, 1]: Min { value: 1 }, [0, 0]: Min { value: 2 }, [1, 1]: Min { value: 1 }, [2, 2]: Min { value: 2 }, [3, 5]: Min { value: 3 }, [3, 4]: Min { value: 3 }, [3, 3]: Min { value: 3 }, [4, 4]: Min { value: 4 }, [5, 5]: Min { value: 5 }, [6, 10]: Min { value: 6 }, [6, 8]: Min { value: 6 }, [6, 7]: Min { value: 6 }, [6, 6]: Min { value: 6 }, [7, 7]: Min { value: 7 }, [8, 8]: Min { value: 8 }, [9, 10]: Min { value: 9 }, [9, 9]: Min { value: 9 }, [10, 10]: Min { value: 10 }} }";
-        assert_eq!(dbg, expected);
+        pretty_assertions::assert_eq!(dbg, expected);
     }
 
     #[test]

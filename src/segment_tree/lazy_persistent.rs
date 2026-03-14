@@ -1,3 +1,5 @@
+use std::range::RangeInclusive;
+
 use bit_vec::BitVec;
 
 use crate::{
@@ -5,7 +7,7 @@ use crate::{
         dbg_utils::{as_dbg_tree, lazy_persistent_visitor},
         persistent_utils::PersistentWrapper,
     },
-    nodes::{LazyNode, Node},
+    traits::{LazyNode, Node},
 };
 
 /// Lazy persistent segment tree, it saves every version of itself, it has range queries and range updates.
@@ -59,62 +61,84 @@ where
     /// Returns the result from the range `[left,right]` from the version of the segment tree.
     /// It returns None if and only if range is empty.
     /// It will **panic** if left or right are not in `[0,n)`, or if version is not in <code>[0,[versions](Self::versions))</code>.
-    /// It has time complexity of `O(log(n))`, assuming that [`combine`](Node::combine), [`update_lazy_value`](LazyNode::update_lazy_value) and [`lazy_update`](LazyNode::lazy_update) have constant time complexity.
+    /// It has time complexity of `O(log(n))`, assuming that [`combine`](Node::combine), [`update_update`](LazyNode::update_update) and [`lazy_update`](LazyNode::lazy_update) have constant time complexity.
     pub fn query(&mut self, version: usize, left: usize, right: usize) -> Option<T> {
-        self.query_helper(self.roots[version], left, right, 0, self.n - 1)
-            .map(PersistentWrapper::into_inner)
+        self.query_helper(
+            self.roots[version],
+            RangeInclusive {
+                start: left,
+                last: right,
+            },
+            RangeInclusive {
+                start: 0,
+                last: self.n - 1,
+            },
+        )
+        .map(PersistentWrapper::into_inner)
     }
 
-    fn push(&mut self, curr_node: usize, i: usize, j: usize) {
-        if self.nodes[curr_node].lazy_value().is_some() && i != j {
+    fn push(&mut self, curr_node: usize, range: RangeInclusive<usize>) {
+        if self.nodes[curr_node].pending().is_some() && !range.is_empty() {
             let left_node = self.nodes.len();
             let right_node = self.nodes.len() + 1;
             self.nodes.push(
                 self.nodes[self.nodes[curr_node]
                     .left_child()
-                    .unwrap_or_else(|| panic!("[{i}, {j}]"))
+                    .unwrap_or_else(|| panic!("{range:?}"))
                     .get()]
                 .clone(),
             );
             self.nodes.push(
                 self.nodes[self.nodes[curr_node]
                     .right_child()
-                    .unwrap_or_else(|| panic!("[{i}, {j}]"))
+                    .unwrap_or_else(|| panic!("{range:?}"))
                     .get()]
                 .clone(),
             );
             let (parent_slice, sons_slice) = self.nodes.split_at_mut(curr_node + 1);
-            let value = parent_slice[curr_node].lazy_value().unwrap();
-            sons_slice[left_node - curr_node - 1].update_lazy_value(value);
-            sons_slice[right_node - curr_node - 1].update_lazy_value(value);
+            let value = parent_slice[curr_node].pending().unwrap();
+            sons_slice[left_node - curr_node - 1].defer(value);
+            sons_slice[right_node - curr_node - 1].defer(value);
             self.nodes[curr_node].set_children(left_node, right_node);
         }
-        self.nodes[curr_node].lazy_update(i, j);
+        self.nodes[curr_node].apply_pending(range);
     }
 
     fn query_helper(
         &mut self,
         curr_node: usize,
-        left: usize,
-        right: usize,
-        i: usize,
-        j: usize,
+        query_range: RangeInclusive<usize>,
+        index_range: RangeInclusive<usize>,
     ) -> Option<PersistentWrapper<T>> {
-        if j < left || right < i {
+        if index_range.last < query_range.start || query_range.last < index_range.start {
             return None;
         }
-        if self.nodes[curr_node].lazy_value().is_some() {
-            self.push(curr_node, i, j);
+        if self.nodes[curr_node].pending().is_some() {
+            self.push(curr_node, index_range);
         }
-        if left <= i && j <= right {
+        if query_range.start <= index_range.start && index_range.last <= query_range.last {
             return Some(self.nodes[curr_node].clone());
         }
-        let mid = usize::midpoint(i, j);
+        let mid = usize::midpoint(index_range.start, index_range.last);
         let left_node = self.nodes[curr_node].left_child().unwrap().get();
         let right_node = self.nodes[curr_node].right_child().unwrap().get();
         match (
-            self.query_helper(left_node, left, right, i, mid),
-            self.query_helper(right_node, left, right, mid + 1, j),
+            self.query_helper(
+                left_node,
+                query_range,
+                RangeInclusive {
+                    start: index_range.start,
+                    last: mid,
+                },
+            ),
+            self.query_helper(
+                right_node,
+                query_range,
+                RangeInclusive {
+                    start: mid + 1,
+                    last: index_range.last,
+                },
+            ),
         ) {
             (Some(ans_left), Some(ans_right)) => Some(Node::combine(&ans_left, &ans_right)),
             (Some(ans_left), None) => Some(ans_left),
@@ -125,53 +149,64 @@ where
 
     /// Creates a new segment tree version from version were the p-th element of the segment tree to value T and update the segment tree correspondingly.
     // It will panic if p is not in `[0,n)`, or if version is not in <code>[0,[versions](Self::versions))</code>
-    /// It has time complexity of `O(log(n))`, assuming that [`combine`](Node::combine), [`update_lazy_value`](LazyNode::update_lazy_value) and [`lazy_update`](LazyNode::lazy_update) have constant time complexity.
+    /// It has time complexity of `O(log(n))`, assuming that [`combine`](Node::combine), [`update_update`](LazyNode::update_update) and [`lazy_update`](LazyNode::lazy_update) have constant time complexity.
     pub fn update(
         &mut self,
         version: usize,
         left: usize,
         right: usize,
-        value: &<T as Node>::Value,
+        value: &<T as LazyNode>::Update,
     ) {
-        let new_root = self.update_helper(self.roots[version], left, right, value, 0, self.n - 1);
+        let new_root = self.update_helper(
+            self.roots[version],
+            RangeInclusive {
+                start: left,
+                last: right,
+            },
+            value,
+            RangeInclusive {
+                start: 0,
+                last: self.n - 1,
+            },
+        );
         self.roots.push(new_root);
     }
 
     fn update_helper(
         &mut self,
         curr_node: usize,
-        left: usize,
-        right: usize,
-        value: &<T as Node>::Value,
-        i: usize,
-        j: usize,
+        query_range: RangeInclusive<usize>,
+        value: &<T as LazyNode>::Update,
+        index_range: RangeInclusive<usize>,
     ) -> usize {
-        if j < left || right < i {
+        if index_range.last < query_range.start || query_range.last < index_range.start {
             return curr_node;
         }
         let x = self.nodes.len();
         self.nodes.push(self.nodes[curr_node].clone());
-        if left <= i && j <= right {
-            self.nodes[x].update_lazy_value(value);
-            self.push(x, i, j);
+        if query_range.start <= index_range.start && index_range.last <= query_range.last {
+            self.nodes[x].defer(value);
+            self.push(x, index_range);
             return x;
         }
-        let mid = usize::midpoint(i, j);
+        let mid = usize::midpoint(index_range.start, index_range.last);
         let left_node = self.update_helper(
             self.nodes[x].left_child().unwrap().get(),
-            left,
-            right,
+            query_range,
             value,
-            i,
-            mid,
+            RangeInclusive {
+                start: index_range.start,
+                last: mid,
+            },
         );
         let right_node = self.update_helper(
             self.nodes[x].right_child().unwrap().get(),
-            left,
-            right,
+            query_range,
             value,
-            mid + 1,
-            j,
+            RangeInclusive {
+                start: mid + 1,
+                last: index_range.last,
+            },
         );
         self.nodes[x] = Node::combine(&self.nodes[left_node], &self.nodes[right_node]);
         self.nodes[x].set_children(left_node, right_node);
@@ -190,11 +225,11 @@ where
     ///
     /// These are two examples, the first is finding the smallest prefix which sums at least some value.
     /// ```
-    /// # use seg_tree::{LazyPersistent,utils::Sum ,nodes::Node};
+    /// # use seg_tree::{LazyPersistent,utils::LazySum ,traits::Node};
     /// let predicate = |left_value: &usize, value: &usize|{ *left_value >= *value }; // Is the sum greater or equal to value?
     /// let g = |left_node: &usize, value: usize|{ value - *left_node }; // Subtract the sum of the prefix.
-    /// # let nodes: Vec<Sum<usize>> = (0..10).map(|x| Sum::initialize(&x)).collect();
-    /// let mut seg_tree = LazyPersistent::build(&nodes); // [0,1,2,3,4,5,6,7,8,9] with Sum<usize> nodes
+    /// # let nodes: Vec<LazySum<usize>> = (0..10).map(|x| LazySum::initialize(&x)).collect();
+    /// let mut seg_tree = LazyPersistent::build(&nodes); // [0,1,2,3,4,5,6,7,8,9] with LazySum<usize> nodes
     /// let index = seg_tree.lower_bound(0, predicate, g, 3); // Will return 2 as sum([0,1,2])>=3
     /// # let sums = vec![0,1,3,6,10,15,21,28,36,45];
     /// # for i in 0..10{
@@ -203,7 +238,7 @@ where
     /// ```
     /// The second is finding the position of the smallest value greater or equal to some value.
     /// ```
-    /// # use seg_tree::{LazyPersistent,utils::{Max, LazySetWrapper},nodes::Node};
+    /// # use seg_tree::{LazyPersistent,utils::{Max, LazySetWrapper},traits::Node};
     /// # type PMax<T> = LazySetWrapper<Max<T>>;
     /// let predicate = |left_value:&usize, value:&usize|{*left_value>=*value}; // Is the maximum greater or equal to value?
     /// let g = |_left_node:&usize,value:usize|{value}; // Do nothing
@@ -229,13 +264,21 @@ where
         F: Fn(&<T as Node>::Value, &<T as Node>::Value) -> bool,
         G: Fn(&<T as Node>::Value, <T as Node>::Value) -> <T as Node>::Value,
     {
-        self.lower_bound_helper(self.roots[version], 0, self.n - 1, predicate, g, value)
+        self.lower_bound_helper(
+            self.roots[version],
+            RangeInclusive {
+                start: 0,
+                last: self.n - 1,
+            },
+            predicate,
+            g,
+            value,
+        )
     }
     fn lower_bound_helper<F, G>(
         &mut self,
         curr_node: usize,
-        i: usize,
-        j: usize,
+        index_range: RangeInclusive<usize>,
         predicate: F,
         g: G,
         value: <T as Node>::Value,
@@ -244,23 +287,41 @@ where
         F: Fn(&<T as Node>::Value, &<T as Node>::Value) -> bool,
         G: Fn(&<T as Node>::Value, <T as Node>::Value) -> <T as Node>::Value,
     {
-        if i == j {
-            return i;
+        if index_range.start == index_range.last {
+            return index_range.start;
         }
-        let mid = usize::midpoint(i, j);
+        let mid = usize::midpoint(index_range.start, index_range.last);
         let left_node = if let Some(l) = self.nodes[curr_node].left_child() {
             l.get()
         } else {
-            self.push(curr_node, i, j);
+            self.push(curr_node, index_range);
             self.nodes[curr_node].left_child().unwrap().get()
         };
         let right_node = self.nodes[curr_node].right_child().unwrap().get();
         let left_value = self.nodes[left_node].value();
         if predicate(left_value, &value) {
-            self.lower_bound_helper(left_node, i, mid, predicate, g, value)
+            self.lower_bound_helper(
+                left_node,
+                RangeInclusive {
+                    start: index_range.start,
+                    last: mid,
+                },
+                predicate,
+                g,
+                value,
+            )
         } else {
             let value = g(left_value, value);
-            self.lower_bound_helper(right_node, mid + 1, j, predicate, g, value)
+            self.lower_bound_helper(
+                right_node,
+                RangeInclusive {
+                    start: mid + 1,
+                    last: index_range.last,
+                },
+                predicate,
+                g,
+                value,
+            )
         }
     }
 }
@@ -298,22 +359,22 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{nodes::Node, segment_tree::lazy_persistent::LazyPersistent, utils::Sum};
+    use crate::{segment_tree::lazy_persistent::LazyPersistent, traits::Node, utils::LazySum};
     #[test]
     fn non_empty_query_returns_some() {
-        let nodes: Vec<Sum<usize>> = (0..=10).map(|x| Sum::initialize(&x)).collect();
+        let nodes: Vec<LazySum<usize>> = (0..=10).map(|x| LazySum::initialize(&x)).collect();
         let mut segment_tree = LazyPersistent::build(&nodes);
         assert!(segment_tree.query(0, 0, 10).is_some());
     }
     #[test]
     fn empty_query_returns_none() {
-        let nodes: Vec<Sum<usize>> = (0..=10).map(|x| Sum::initialize(&x)).collect();
+        let nodes: Vec<LazySum<usize>> = (0..=10).map(|x| LazySum::initialize(&x)).collect();
         let mut segment_tree = LazyPersistent::build(&nodes);
         assert!(segment_tree.query(0, 10, 0).is_none());
     }
     #[test]
     fn normal_update_works() {
-        let nodes: Vec<Sum<usize>> = (0..=10).map(|x| Sum::initialize(&x)).collect();
+        let nodes: Vec<LazySum<usize>> = (0..=10).map(|x| LazySum::initialize(&x)).collect();
         let mut segment_tree = LazyPersistent::build(&nodes);
         let value = 20;
         segment_tree.update(0, 0, 0, &value);
@@ -322,7 +383,7 @@ mod tests {
 
     #[test]
     fn branched_update_works() {
-        let nodes: Vec<Sum<usize>> = (0..=10).map(|x| Sum::initialize(&x)).collect();
+        let nodes: Vec<LazySum<usize>> = (0..=10).map(|x| LazySum::initialize(&x)).collect();
         let mut segment_tree = LazyPersistent::build(&nodes);
         let value = 20;
         segment_tree.update(0, 0, 10, &value);
@@ -333,18 +394,18 @@ mod tests {
 
     #[test]
     fn query_works() {
-        let nodes: Vec<Sum<usize>> = (0..=10).map(|x| Sum::initialize(&x)).collect();
+        let nodes: Vec<LazySum<usize>> = (0..=10).map(|x| LazySum::initialize(&x)).collect();
         let mut segment_tree = LazyPersistent::build(&nodes);
         assert_eq!(segment_tree.query(0, 0, 10).unwrap().value(), &55);
     }
 
     #[test]
     fn dbg_works() {
-        let nodes: Vec<Sum<usize>> = (0..=10).map(|x| Sum::initialize(&x)).collect();
+        let nodes: Vec<LazySum<usize>> = (0..=10).map(|x| LazySum::initialize(&x)).collect();
         let mut segment_tree = LazyPersistent::build(&nodes);
         segment_tree.update(0, 0, 1, &2);
         let dbg = format!("{segment_tree:?}");
-        let expected = "LazyPersistent { n: 11, root_nodes: [20, 21], nodes: {[0, 10]: Sum { value: 55, lazy_value: None }, [0, 5]: Sum { value: 15, lazy_value: None }, [0, 2]: Sum { value: 3, lazy_value: None }, [0, 1]: Sum { value: 1, lazy_value: None }, [0, 0]: Sum { value: 0, lazy_value: None }, [1, 1]: Sum { value: 1, lazy_value: None }, [2, 2]: Sum { value: 2, lazy_value: None }, [3, 5]: Sum { value: 12, lazy_value: None }, [3, 4]: Sum { value: 7, lazy_value: None }, [3, 3]: Sum { value: 3, lazy_value: None }, [4, 4]: Sum { value: 4, lazy_value: None }, [5, 5]: Sum { value: 5, lazy_value: None }, [6, 10]: Sum { value: 40, lazy_value: None }, [6, 8]: Sum { value: 21, lazy_value: None }, [6, 7]: Sum { value: 13, lazy_value: None }, [6, 6]: Sum { value: 6, lazy_value: None }, [7, 7]: Sum { value: 7, lazy_value: None }, [8, 8]: Sum { value: 8, lazy_value: None }, [9, 10]: Sum { value: 19, lazy_value: None }, [9, 9]: Sum { value: 9, lazy_value: None }, [10, 10]: Sum { value: 10, lazy_value: None }, [0, 10]: Sum { value: 59, lazy_value: None }, [0, 5]: Sum { value: 19, lazy_value: None }, [0, 2]: Sum { value: 7, lazy_value: None }, [0, 1]: Sum { value: 5, lazy_value: None }, [0, 0]: Sum { value: 0, lazy_value: Some(2) }, [1, 1]: Sum { value: 1, lazy_value: Some(2) }} }";
-        assert_eq!(dbg, expected);
+        let expected = "LazyPersistent { n: 11, root_nodes: [20, 21], nodes: {[0, 10]: LazySum { value: 55, update: None }, [0, 5]: LazySum { value: 15, update: None }, [0, 2]: LazySum { value: 3, update: None }, [0, 1]: LazySum { value: 1, update: None }, [0, 0]: LazySum { value: 0, update: None }, [1, 1]: LazySum { value: 1, update: None }, [2, 2]: LazySum { value: 2, update: None }, [3, 5]: LazySum { value: 12, update: None }, [3, 4]: LazySum { value: 7, update: None }, [3, 3]: LazySum { value: 3, update: None }, [4, 4]: LazySum { value: 4, update: None }, [5, 5]: LazySum { value: 5, update: None }, [6, 10]: LazySum { value: 40, update: None }, [6, 8]: LazySum { value: 21, update: None }, [6, 7]: LazySum { value: 13, update: None }, [6, 6]: LazySum { value: 6, update: None }, [7, 7]: LazySum { value: 7, update: None }, [8, 8]: LazySum { value: 8, update: None }, [9, 10]: LazySum { value: 19, update: None }, [9, 9]: LazySum { value: 9, update: None }, [10, 10]: LazySum { value: 10, update: None }, [0, 10]: LazySum { value: 59, update: None }, [0, 5]: LazySum { value: 19, update: None }, [0, 2]: LazySum { value: 7, update: None }, [0, 1]: LazySum { value: 5, update: None }, [0, 0]: LazySum { value: 0, update: Some(2) }, [1, 1]: LazySum { value: 1, update: Some(2) }} }";
+        pretty_assertions::assert_eq!(dbg, expected);
     }
 }

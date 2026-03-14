@@ -1,11 +1,11 @@
 use core::mem::MaybeUninit;
 #[cfg(any(feature = "bifurcate", doc))]
 use core::ops::Range;
-use std::sync::Mutex;
+use std::{range::RangeInclusive, sync::Mutex};
 
 use crate::{
     internal_utils::dbg_utils::{as_dbg_tree, recursive_visitor},
-    nodes::{LazyNode, Node},
+    traits::{LazyNode, Node},
 };
 
 /// Lazy segment tree with range queries and range updates.
@@ -64,63 +64,81 @@ impl<T: LazyNode + Clone> LazyRecursive<T> {
         ));
     }
 
-    fn push(&self, u: usize, i: usize, j: usize) {
-        // parent_slice.len() == u + 1 && sons_slice.len() == 4*self.n - (u + 1)
+    fn push(&self, u: usize, range: RangeInclusive<usize>) {
         let mut nodes = self
             .nodes
-            .lock()
+            .try_lock()
             .expect("Mutex is poisoned, thread should crash");
+        debug_assert!(
+            u + 1 < nodes.len(),
+            "u: {u:?}, nodes.len(): {:?}, range: {range:?}",
+            nodes.len()
+        );
         let (parent_slice, sons_slice) = nodes.split_at_mut(u + 1);
-        if let Some(value) = parent_slice[u].lazy_value()
-            && i != j
+        if let Some(value) = parent_slice[u].pending()
+            && !range.is_empty()
         {
-            sons_slice[u].update_lazy_value(value); // At 2*u + 1 - (u + 1)
-            sons_slice[u + 1].update_lazy_value(value); // At 2*u + 2 - (u + 1)
+            sons_slice[u].defer(value); // At 2*u + 1 - (u + 1)
+            sons_slice[u + 1].defer(value); // At 2*u + 2 - (u + 1)
         }
-        nodes[u].lazy_update(i, j);
+        nodes[u].apply_pending(range);
     }
 
     /// Updates the range `[i,j]` with value.
     /// It will panic if `i` or `j` is not in `[0,n)`.
     /// It has time complexity of `O(log(n))`, assuming that [`combine`](Node::combine), [`update_lazy_value`](LazyNode::update_lazy_value) and [`lazy_update`](LazyNode::lazy_update) have constant time complexity.
-    pub fn update(&mut self, i: usize, j: usize, value: &<T as Node>::Value) {
-        self.update_helper(i, j, value, 0, 0, self.n - 1);
+    pub fn update(&mut self, i: usize, j: usize, value: &<T as LazyNode>::Update) {
+        self.update_helper(
+            RangeInclusive { start: i, last: j },
+            value,
+            0,
+            RangeInclusive {
+                start: 0,
+                last: self.n - 1,
+            },
+        );
     }
 
     fn update_helper(
         &mut self,
-        left: usize,
-        right: usize,
-        value: &<T as Node>::Value,
+        query_range: RangeInclusive<usize>,
+        value: &<T as LazyNode>::Update,
         curr_node: usize,
-        i: usize,
-        j: usize,
+        index_range: RangeInclusive<usize>,
     ) {
-        if self
-            .nodes
-            .lock()
-            .expect("Mutex is poisoned, thread should crash")[curr_node]
-            .lazy_value()
-            .is_some()
-        {
-            self.push(curr_node, i, j);
-        }
-        if j < left || right < i {
+        self.push(curr_node, index_range);
+        if index_range.last < query_range.start || query_range.last < index_range.start {
             return;
         }
-        if left <= i && j <= right {
+        if query_range.start <= index_range.start && index_range.last <= query_range.last {
             self.nodes
                 .get_mut()
                 .expect("Mutex is poisoned, thread should crash")[curr_node]
-                .update_lazy_value(value);
-            self.push(curr_node, i, j);
+                .defer(value);
+            self.push(curr_node, index_range);
             return;
         }
-        let mid = usize::midpoint(i, j);
+        let mid = usize::midpoint(index_range.start, index_range.last);
         let left_node = 2 * curr_node + 1;
         let right_node = 2 * curr_node + 2;
-        self.update_helper(left, right, value, left_node, i, mid);
-        self.update_helper(left, right, value, right_node, mid + 1, j);
+        self.update_helper(
+            query_range,
+            value,
+            left_node,
+            RangeInclusive {
+                start: index_range.start,
+                last: mid,
+            },
+        );
+        self.update_helper(
+            query_range,
+            value,
+            right_node,
+            RangeInclusive {
+                start: mid + 1,
+                last: index_range.last,
+            },
+        );
 
         let nodes = self
             .nodes
@@ -134,33 +152,34 @@ impl<T: LazyNode + Clone> LazyRecursive<T> {
     /// It will **panic** if `left` or `right` are not in `[0,n)`.
     /// It has time complexity of `O(log(n))`, assuming that [`combine`](Node::combine), [`update_lazy_value`](LazyNode::update_lazy_value) and [`lazy_update`](LazyNode::lazy_update) have constant time complexity.
     pub fn query(&self, left: usize, right: usize) -> Option<T> {
-        self.query_helper(left, right, 0, 0, self.n - 1)
+        self.query_helper(
+            RangeInclusive {
+                start: left,
+                last: right,
+            },
+            0,
+            RangeInclusive {
+                start: 0,
+                last: self.n - 1,
+            },
+        )
     }
 
     fn query_helper(
         &self,
-        left: usize,
-        right: usize,
+        query_range: RangeInclusive<usize>,
         curr_node: usize,
-        i: usize,
-        j: usize,
+        index_range: RangeInclusive<usize>,
     ) -> Option<T> {
-        if j < left || right < i {
+        if index_range.last < query_range.start || query_range.last < index_range.start {
             return None;
         }
-        let mid = usize::midpoint(i, j);
+        let mid = usize::midpoint(index_range.start, index_range.last);
         let left_node = 2 * curr_node + 1;
         let right_node = 2 * curr_node + 2;
-        if self
-            .nodes
-            .lock()
-            .expect("Mutex is poisoned, thread should crash")[curr_node]
-            .lazy_value()
-            .is_some()
-        {
-            self.push(curr_node, i, j);
-        }
-        if left <= i && j <= right {
+        self.push(curr_node, index_range);
+
+        if query_range.start <= index_range.start && index_range.last <= query_range.last {
             return Some(
                 self.nodes
                     .lock()
@@ -169,8 +188,22 @@ impl<T: LazyNode + Clone> LazyRecursive<T> {
             );
         }
         match (
-            self.query_helper(left, right, left_node, i, mid),
-            self.query_helper(left, right, right_node, mid + 1, j),
+            self.query_helper(
+                query_range,
+                left_node,
+                RangeInclusive {
+                    start: index_range.start,
+                    last: mid,
+                },
+            ),
+            self.query_helper(
+                query_range,
+                right_node,
+                RangeInclusive {
+                    start: mid + 1,
+                    last: index_range.last,
+                },
+            ),
         ) {
             (Some(ans_left), Some(ans_right)) => Some(Node::combine(&ans_left, &ans_right)),
             (Some(ans_left), None) => Some(ans_left),
@@ -209,24 +242,14 @@ where
         let right_node_index = 2 * curr_node_index + 2;
         // We need to check if our node needs to update
         // and then check if our left node needs to update, as we'll combine it later
-        if self
-            .nodes
-            .lock()
-            .expect("Mutex is poisoned, thread should crash")[curr_node_index]
-            .lazy_value()
-            .is_some()
-        {
-            self.push(curr_node_index, i, j);
-            if self
-                .nodes
-                .lock()
-                .expect("Mutex is poisoned, thread should crash")[left_node_index]
-                .lazy_value()
-                .is_some()
-            {
-                self.push(left_node_index, i, mid);
-            }
-        }
+        self.push(curr_node_index, RangeInclusive { start: i, last: j });
+        self.push(
+            left_node_index,
+            RangeInclusive {
+                start: i,
+                last: mid,
+            },
+        );
         let node_lock = self
             .nodes
             .lock()
@@ -267,24 +290,14 @@ where
         let right_node_index = 2 * curr_node_index + 2;
         // We need to check if our node needs to update
         // and then check if our left node needs to update, as we'll combine it later
-        if self
-            .nodes
-            .lock()
-            .expect("Mutex is poisoned, thread should crash")[curr_node_index]
-            .lazy_value()
-            .is_some()
-        {
-            self.push(curr_node_index, i, j);
-            if self
-                .nodes
-                .lock()
-                .expect("Mutex is poisoned, thread should crash")[left_node_index]
-                .lazy_value()
-                .is_some()
-            {
-                self.push(left_node_index, i, mid);
-            }
-        }
+        self.push(curr_node_index, RangeInclusive { start: i, last: j });
+        self.push(
+            left_node_index,
+            RangeInclusive {
+                start: i,
+                last: mid,
+            },
+        );
         let node_lock = self
             .nodes
             .lock()
@@ -323,24 +336,14 @@ where
         let right_node_index = 2 * curr_node_index + 2;
         // We need to check if our node needs to update
         // and then check if our left node needs to update, as we'll combine it later
-        if self
-            .nodes
-            .lock()
-            .expect("Mutex is poisoned, thread should crash")[curr_node_index]
-            .lazy_value()
-            .is_some()
-        {
-            self.push(curr_node_index, i, j);
-            if self
-                .nodes
-                .lock()
-                .expect("Mutex is poisoned, thread should crash")[left_node_index]
-                .lazy_value()
-                .is_some()
-            {
-                self.push(left_node_index, i, mid);
-            }
-        }
+        self.push(curr_node_index, RangeInclusive { start: i, last: j });
+        self.push(
+            left_node_index,
+            RangeInclusive {
+                start: i,
+                last: mid,
+            },
+        );
         let node_lock = self
             .nodes
             .lock()
@@ -430,23 +433,26 @@ where
 #[cfg(test)]
 mod tests {
     use crate::{
-        nodes::Node,
+        traits::Node,
         utils::{LazySetWrapper, Min},
     };
 
     use super::LazyRecursive;
 
-    type LSMin<T> = LazySetWrapper<Min<T>>;
+    type LSMin<T: Ord + Clone> = LazySetWrapper<Min<T>>;
 
     #[test]
     fn build_works() {
         let n = 16;
         let nodes: Vec<LSMin<usize>> = (0..n).map(|x| LSMin::initialize(&x)).collect();
         let segment_tree = LazyRecursive::build(&nodes);
-        for i in 0..n {
-            let temp = segment_tree.query(i, i).unwrap();
-            assert_eq!(temp.value(), &i);
-        }
+        let vals: Vec<_> = (0..n)
+            .filter_map(|i| {
+                let val = segment_tree.query(i, i).unwrap();
+                (val.value() != &i).then_some((*val.value(), i))
+            })
+            .collect();
+        assert!(vals.is_empty(), "vals: {vals:?}");
     }
     #[test]
     fn non_empty_query_returns_some() {
@@ -482,6 +488,22 @@ mod tests {
         segment_tree.update(0, 1, &2);
         let dbg = format!("{segment_tree:?}");
         let expected = "LazyRecursive { n: 11, nodes: {[0, 10]: LazySetWrapper { node: Min { value: 2 }, lazy_value: None }, [0, 5]: LazySetWrapper { node: Min { value: 2 }, lazy_value: None }, [0, 2]: LazySetWrapper { node: Min { value: 2 }, lazy_value: None }, [0, 1]: LazySetWrapper { node: Min { value: 2 }, lazy_value: None }, [0, 0]: LazySetWrapper { node: Min { value: 0 }, lazy_value: Some(2) }, [1, 1]: LazySetWrapper { node: Min { value: 1 }, lazy_value: Some(2) }, [2, 2]: LazySetWrapper { node: Min { value: 2 }, lazy_value: None }, [3, 5]: LazySetWrapper { node: Min { value: 3 }, lazy_value: None }, [3, 4]: LazySetWrapper { node: Min { value: 3 }, lazy_value: None }, [3, 3]: LazySetWrapper { node: Min { value: 3 }, lazy_value: None }, [4, 4]: LazySetWrapper { node: Min { value: 4 }, lazy_value: None }, [5, 5]: LazySetWrapper { node: Min { value: 5 }, lazy_value: None }, [6, 10]: LazySetWrapper { node: Min { value: 6 }, lazy_value: None }, [6, 8]: LazySetWrapper { node: Min { value: 6 }, lazy_value: None }, [6, 7]: LazySetWrapper { node: Min { value: 6 }, lazy_value: None }, [6, 6]: LazySetWrapper { node: Min { value: 6 }, lazy_value: None }, [7, 7]: LazySetWrapper { node: Min { value: 7 }, lazy_value: None }, [8, 8]: LazySetWrapper { node: Min { value: 8 }, lazy_value: None }, [9, 10]: LazySetWrapper { node: Min { value: 9 }, lazy_value: None }, [9, 9]: LazySetWrapper { node: Min { value: 9 }, lazy_value: None }, [10, 10]: LazySetWrapper { node: Min { value: 10 }, lazy_value: None }} }";
-        assert_eq!(dbg, expected);
+        pretty_assertions::assert_eq!(dbg, expected);
+    }
+
+    #[test]
+    fn compose_accumulates_across_two_updates() {
+        // Two overlapping range-add updates should accumulate on any node that
+        // still holds unflushed pending state from the first update when the
+        // second one arrives, not silently drop or overwrite it.
+        use crate::utils::LazySum;
+        let nodes: Vec<LazySum<usize>> = (0..8).map(|x| LazySum::initialize(&x)).collect();
+        let mut segment_tree = LazyRecursive::build(&nodes);
+        segment_tree.update(0, 7, &10); // whole range: +10 everywhere, pushed
+        // down and left unflushed partway
+        segment_tree.update(0, 3, &5); // sub-range: +5, lands on a node that
+        // may still carry unflushed +10
+        assert_eq!(segment_tree.query(0, 0).unwrap().value(), &15); // 0 + 10 + 5
+        assert_eq!(segment_tree.query(5, 5).unwrap().value(), &15); // 5 + 10, untouched by second update
     }
 }
