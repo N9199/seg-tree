@@ -23,6 +23,7 @@ where
     pub fn build(values: &[T]) -> Self {
         let n = values.len();
         let mut nodes = Vec::with_capacity(4 * n);
+        // SAFETY: As the nodes are of type `MaybeUninit<T>` this is safe.
         unsafe { nodes.set_len(4 * n) };
         if n == 0 {
             return Self {
@@ -32,8 +33,12 @@ where
         }
         Self::build_helper(0, 0, n - 1, values, &mut nodes);
         let ptr = nodes.as_mut_ptr();
+        let len = nodes.len();
+        let cap = nodes.capacity();
+        debug_assert_eq!(len, cap);
+        debug_assert_eq!(len, 4 * n);
         core::mem::forget(nodes);
-        let nodes = unsafe { Vec::from_raw_parts(ptr.cast::<T>(), 4 * n, 4 * n) }; // Unsafe AF, but if it's coded correctly the only nodes which will ever be accessed are already initialized
+        let nodes = unsafe { Vec::from_raw_parts(ptr.cast::<T>(), len, cap) }; // Unsafe AF, but if it's coded correctly the only nodes which will ever be accessed are already initialized
 
         Self { nodes, n }
     }
@@ -50,7 +55,7 @@ where
             nodes[curr_node].write(values[i].clone());
             return;
         }
-        let mid = (i + j) / 2;
+        let mid = usize::midpoint(i, j);
         let left_node = 2 * curr_node + 1;
         let right_node = 2 * curr_node + 2;
         Self::build_helper(left_node, i, mid, values, nodes);
@@ -85,7 +90,7 @@ where
             self.nodes[curr_node] = Node::initialize(value);
             return;
         }
-        let mid = (i + j) / 2;
+        let mid = usize::midpoint(i, j);
         let left_node = 2 * curr_node + 1;
         let right_node = 2 * curr_node + 2;
         self.update_helper(p, value, left_node, i, mid);
@@ -114,7 +119,7 @@ where
         if j < left || right < i {
             return None;
         }
-        let mid = (i + j) / 2;
+        let mid = usize::midpoint(i, j);
         let left_node = 2 * curr_node + 1;
         let right_node = 2 * curr_node + 2;
         if left <= i && j <= right {
@@ -251,7 +256,7 @@ mod tests {
     }
 
     #[test]
-    fn dbg_works(){
+    fn dbg_works() {
         let nodes: Vec<Min<usize>> = (0..=10).map(|x| Min::initialize(&x)).collect();
         let mut segment_tree = Recursive::build(&nodes);
         segment_tree.update(0, &2);

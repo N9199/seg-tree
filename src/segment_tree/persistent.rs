@@ -1,8 +1,15 @@
 use bit_vec::BitVec;
 
-use crate::{internal_utils::{persistent_utils::PersistentWrapper, dbg_utils::{as_dbg_tree, persistent_visitor}}, nodes::Node};
+use crate::{
+    internal_utils::{
+        dbg_utils::{as_dbg_tree, persistent_visitor},
+        persistent_utils::PersistentWrapper,
+    },
+    nodes::Node,
+};
 
 /// Persistent segment tree, it saves every version of itself, it has range queries and point updates.
+///
 /// It uses `O(n+q*log(n))` space, where `q` is the amount of updates, and assuming that each node uses `O(1)` space.
 pub struct Persistent<T> {
     nodes: Vec<PersistentWrapper<T>>,
@@ -32,7 +39,7 @@ where
     }
 
     fn build_helper(&mut self, values: &[T], i: usize, j: usize) -> usize {
-        let mid = (i + j) / 2;
+        let mid = usize::midpoint(i, j);
         if i == j {
             let curr_node = self.nodes.len();
             self.nodes.push(values[i].clone().into());
@@ -41,15 +48,17 @@ where
         let left_node = self.build_helper(values, i, mid);
         let right_node = self.build_helper(values, mid + 1, j);
         let curr_node = self.nodes.len();
-        self.nodes
-            .push(Node::combine(&self.nodes[left_node], &self.nodes[right_node]));
+        self.nodes.push(Node::combine(
+            &self.nodes[left_node],
+            &self.nodes[right_node],
+        ));
         self.nodes[curr_node].set_children(left_node, right_node);
         curr_node
     }
 
     /// Returns the result from the range `[left,right]` from the version of the segment tree.
     /// It returns None if and only if range is empty.
-    /// It will **panic** if left or right are not in `[0,n)`, or if version is not in `[0,`[`versions`](Self::versions)`)`.
+    /// It will **panic** if left or right are not in `[0,n)`, or if version is not in <code>[0,[versions](Self::versions))</code>.
     /// It has time complexity of `O(log(n))`, assuming that [`combine`](Node::combine) has constant time complexity.
     #[allow(clippy::must_use_candidate)]
     pub fn query(&self, version: usize, left: usize, right: usize) -> Option<T> {
@@ -71,7 +80,7 @@ where
         if left <= i && j <= right {
             return Some(self.nodes[curr_node].clone());
         }
-        let mid = (i + j) / 2;
+        let mid = usize::midpoint(i, j);
         let left_node = self.nodes[curr_node].left_child().unwrap().get();
         let right_node = self.nodes[curr_node].right_child().unwrap().get();
         match (
@@ -86,7 +95,7 @@ where
     }
 
     /// Creates a new segment tree version from version were the p-th element of the segment tree to value T and update the segment tree correspondingly.
-    /// It will panic if p is not in `[0,n)`, or if version is not in `[0,`[`versions`](Self::versions)`)`.
+    /// It will panic if p is not in `[0,n)`, or if version is not in <code>[0,[versions](Self::versions))</code>.
     /// It has time complexity of `O(log(n))`, assuming that [`combine`](Node::combine) has constant time complexity.
     pub fn update(&mut self, version: usize, p: usize, value: &<T as Node>::Value) {
         let new_root = self.update_helper(self.roots[version], p, value, 0, self.n - 1);
@@ -110,7 +119,7 @@ where
             self.nodes[x] = Node::initialize(value);
             return x;
         }
-        let mid = (i + j) / 2;
+        let mid = usize::midpoint(i, j);
         let left_node =
             self.update_helper(self.nodes[x].left_child().unwrap().get(), p, value, i, mid);
         let right_node = self.update_helper(
@@ -124,9 +133,9 @@ where
         self.nodes[x].set_children(left_node, right_node);
         x
     }
-    /// Returns the amount of different versions the current segment tree has. Essentially this will be how many calls to [`update`](Self::update) have happened. 
+    /// Returns the amount of different versions the current segment tree has. Essentially this will be how many calls to [`update`](Self::update) have happened.
     #[allow(clippy::must_use_candidate)]
-    pub fn versions(&self) -> usize {
+    pub const fn versions(&self) -> usize {
         self.roots.len()
     }
 
@@ -192,7 +201,7 @@ where
         if i == j {
             return i;
         }
-        let mid = (i + j) / 2;
+        let mid = usize::midpoint(i, j);
         let left_node = self.nodes[curr_node].left_child().unwrap().get();
         let right_node = self.nodes[curr_node].right_child().unwrap().get();
         let left_value = self.nodes[left_node].value();
@@ -204,7 +213,6 @@ where
         }
     }
 }
-
 
 impl<T> core::fmt::Debug for Persistent<T>
 where
@@ -220,14 +228,7 @@ where
                     |nodes, f| {
                         let mut visited = BitVec::from_elem(len, false);
                         for root_node in &self.roots {
-                            persistent_visitor(
-                                *root_node,
-                                0,
-                                self.n - 1,
-                                f,
-                                nodes,
-                                &mut visited,
-                            );
+                            persistent_visitor(*root_node, 0, self.n - 1, f, nodes, &mut visited);
                         }
                     }
                 }),
@@ -235,7 +236,6 @@ where
             .finish()
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -280,7 +280,7 @@ mod tests {
     }
 
     #[test]
-    fn dbg_works(){
+    fn dbg_works() {
         let nodes: Vec<Sum<usize>> = (0..=10).map(|x| Sum::initialize(&x)).collect();
         let mut segment_tree = Persistent::build(&nodes);
         segment_tree.update(0, 1, &2);

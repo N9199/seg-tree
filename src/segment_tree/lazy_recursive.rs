@@ -43,7 +43,7 @@ impl<T: LazyNode + Clone> LazyRecursive<T> {
             nodes[curr_node].write(values[i].clone());
             return;
         }
-        let mid = (i + j) / 2;
+        let mid = usize::midpoint(i, j);
         let left_node = 2 * curr_node + 1;
         let right_node = 2 * curr_node + 2;
         Self::build_helper(left_node, i, mid, values, nodes);
