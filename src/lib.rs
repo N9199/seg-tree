@@ -15,6 +15,10 @@
 #![warn(clippy::nursery)]
 #![warn(missing_docs)]
 #![cfg_attr(any(doc, docsrs), feature(doc_cfg))]
+#![cfg_attr(
+    feature = "nightly_unstable",
+    feature(generic_const_exprs, lazy_type_alias)
+)]
 /// Node traits.
 pub mod nodes;
 /// Segment trees.

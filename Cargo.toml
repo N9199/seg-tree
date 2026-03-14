@@ -32,3 +32,5 @@ bifurcate = {version = "0.1.0", default-features = false, optional = true}
 
 [features]
 bifurcate = ["dep:bifurcate"]
+nightly = []
+nightly_unstable = ["nightly"]

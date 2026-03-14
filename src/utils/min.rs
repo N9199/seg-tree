@@ -1,4 +1,4 @@
-use crate::nodes::Node;
+use crate::nodes::{Node, WideNode};
 
 /// Implementation of range min for generic type T, it only implements [`Node`].
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -21,6 +21,19 @@ where
     }
     fn value(&self) -> &Self::Value {
         &self.value
+    }
+}
+
+impl<const B: usize, T> WideNode<B> for Min<T>
+where
+    T: Ord + Clone,
+{
+    fn combine_multiple(values: &[Self; B]) -> Self {
+        values
+            .iter()
+            .min_by_key(|value| &value.value)
+            .unwrap()
+            .clone()
     }
 }
 #[cfg(test)]
