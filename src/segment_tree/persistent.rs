@@ -56,12 +56,20 @@ where
         curr_node
     }
 
-    /// Returns the result from the range `[left,right]` from the version of the segment tree.
-    /// It returns None if and only if range is empty.
-    /// It will **panic** if left or right are not in `[0,n)`, or if version is not in <code>[0,[versions](Self::versions))</code>.
+    /// Returns the aggregate in `version` of the inclusive range `[left, right]`
+    /// intersected with the original slice. Returns `None` if the intersection
+    /// or tree is empty. Empty trees return `None` regardless of `version`.
+    ///
+    /// # Panics
+    /// Panics if the tree is nonempty and `version` is not in `0..self.versions()`.
+    ///
+    /// # Complexity
     /// It has time complexity of `O(log(n))`, assuming that [`combine`](Node::combine) has constant time complexity.
     #[allow(clippy::must_use_candidate)]
     pub fn query(&self, version: usize, left: usize, right: usize) -> Option<T> {
+        if self.n == 0 {
+            return None;
+        }
         self.query_helper(self.roots[version], left, right, 0, self.n - 1)
             .map(PersistentWrapper::into_inner)
     }
@@ -239,7 +247,12 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{segment_tree::Persistent, traits::Node, utils::Sum};
+    use crate::{
+        internal_utils::test_utils::{assert_prefix_search_matches, assert_range_matches},
+        segment_tree::Persistent,
+        traits::Node,
+        utils::Sum,
+    };
 
     #[test]
     fn non_empty_query_returns_some() {
@@ -259,7 +272,15 @@ mod tests {
         let mut segment_tree = Persistent::build(&nodes);
         let value = 20;
         segment_tree.update(0, 0, &value);
-        assert_eq!(segment_tree.query(1, 0, 0).unwrap().value(), &value);
+        let mut updated_values: Vec<usize> = (0..=10).collect();
+        updated_values[0] = value;
+        for (version, values) in [(0, (0..=10).collect()), (1, updated_values)] {
+            assert_range_matches(
+                &values,
+                |left, right| *segment_tree.query(version, left, right).unwrap().value(),
+                |range| range.iter().sum::<usize>(),
+            );
+        }
     }
 
     #[test]
@@ -269,15 +290,73 @@ mod tests {
         let value = 20;
         segment_tree.update(0, 0, &value);
         segment_tree.update(0, 1, &value);
-        assert_eq!(segment_tree.query(2, 0, 0).unwrap().value(), &0);
-        assert_eq!(segment_tree.query(2, 1, 1).unwrap().value(), &value);
+        let original: Vec<usize> = (0..=10).collect();
+        let mut first_branch = original.clone();
+        first_branch[0] = value;
+        let mut second_branch = original.clone();
+        second_branch[1] = value;
+        for (version, values) in [original, first_branch, second_branch].iter().enumerate() {
+            assert_range_matches(
+                values,
+                |left, right| *segment_tree.query(version, left, right).unwrap().value(),
+                |range| range.iter().sum::<usize>(),
+            );
+        }
     }
 
     #[test]
     fn query_works() {
-        let nodes: Vec<Sum<usize>> = (0..=10).map(|x| Sum::initialize(&x)).collect();
-        let segment_tree = Persistent::build(&nodes);
-        assert_eq!(segment_tree.query(0, 0, 10).unwrap().value(), &55);
+        for values in [vec![4usize], vec![0, 3, 1], (0..=10).collect()] {
+            let nodes: Vec<_> = values.iter().map(Sum::initialize).collect();
+            let segment_tree = Persistent::build(&nodes);
+            assert_range_matches(
+                &values,
+                |left, right| *segment_tree.query(0, left, right).unwrap().value(),
+                |range| range.iter().sum::<usize>(),
+            );
+        }
+    }
+
+    #[test]
+    fn prefix_search_matches_across_updated_and_branched_versions() {
+        for values in [
+            vec![0usize],
+            vec![0, 3, 1],
+            vec![2, 0, 4, 0, 1],
+            vec![0, 2, 1, 0, 3, 0, 4, 1],
+        ] {
+            let nodes: Vec<_> = values.iter().map(Sum::initialize).collect();
+            let mut tree = Persistent::build(&nodes);
+            let mut versions = vec![values];
+            let last = versions[0].len() - 1;
+            for (parent, index, value) in [(0, 0, 5), (1, last, 0), (0, last, 7), (3, 0, 0)] {
+                tree.update(parent, index, &value);
+                let mut updated = versions[parent].clone();
+                updated[index] = value;
+                versions.push(updated);
+            }
+            assert_eq!(tree.versions(), versions.len());
+            for (version, values) in versions.iter().enumerate() {
+                assert_range_matches(
+                    values,
+                    |left, right| *tree.query(version, left, right).unwrap().value(),
+                    |range| range.iter().sum::<usize>(),
+                );
+                assert_prefix_search_matches(
+                    values,
+                    0..=values.iter().sum::<usize>(),
+                    |target| {
+                        Some(tree.lower_bound(
+                            version,
+                            |sum, target| sum >= target,
+                            |sum, target| target - sum,
+                            *target,
+                        ))
+                    },
+                    |prefix, target| prefix.iter().sum::<usize>() >= *target,
+                );
+            }
+        }
     }
 
     #[test]

@@ -10,9 +10,15 @@ use crate::{
     traits::{LazyNode, Node},
 };
 
-/// Lazy persistent segment tree, it saves every version of itself, it has range queries and range updates.
+/// A persistent segment tree supporting lazy range updates and inclusive range queries.
 ///
-/// It uses `O(n+q*log(n))` space, where `q` is the amount of updates, and assuming that each node uses `O(1)` space.
+/// Updates can branch from any existing version without changing its logical values.
+/// Queries and prefix searches take `&mut self` because they materialize pending
+/// updates and may allocate nodes, but they do not create versions or change values.
+///
+/// It uses `O(n + q*log(n + 1))` arena space, where `q` counts updates,
+/// queries, and prefix searches, assuming each node uses `O(1)` space.
+/// Reads may also allocate nodes while materializing pending updates.
 pub struct LazyPersistent<T> {
     nodes: Vec<PersistentWrapper<T>>,
     roots: Vec<usize>,
@@ -24,7 +30,8 @@ where
     T: LazyNode + Clone,
 {
     /// Builds a lazy persistent segment tree from slice, each element of the slice will correspond to a leaf of the segment tree.
-    /// It has time complexity of `O(n*log(n))`, assuming that [`combine`](Node::combine) has constant time complexity.
+    /// Takes `O(n)` time, assuming cloning and [`combine`](Node::combine) take constant time.
+    /// A nonempty slice creates version `0`; an empty slice creates no versions.
     pub fn build(values: &[T]) -> Self {
         let n = values.len();
         let mut temp = Self {
@@ -58,11 +65,20 @@ where
         curr_node
     }
 
-    /// Returns the result from the range `[left,right]` from the version of the segment tree.
-    /// It returns None if and only if range is empty.
-    /// It will **panic** if left or right are not in `[0,n)`, or if version is not in <code>[0,[versions](Self::versions))</code>.
-    /// It has time complexity of `O(log(n))`, assuming that [`combine`](Node::combine), [`update_update`](LazyNode::update_update) and [`lazy_update`](LazyNode::lazy_update) have constant time complexity.
+    /// Returns the aggregate in `version` of the inclusive range `[left, right]`
+    /// intersected with the original slice. Returns `None` if the intersection
+    /// or tree is empty. Empty trees return `None` regardless of `version`.
+    ///
+    /// Takes `O(log(n + 1))` time, assuming cloning, [`combine`](Node::combine),
+    /// [`defer`](LazyNode::defer), and [`apply_pending`](LazyNode::apply_pending)
+    /// take constant time. May allocate nodes while materializing pending updates.
+    ///
+    /// # Panics
+    /// Panics if the tree is nonempty and `version` is not in `0..self.versions()`.
     pub fn query(&mut self, version: usize, left: usize, right: usize) -> Option<T> {
+        if self.n == 0 {
+            return None;
+        }
         self.query_helper(
             self.roots[version],
             RangeInclusive {
@@ -77,8 +93,13 @@ where
         .map(PersistentWrapper::into_inner)
     }
 
+    // Pending updates are excluded from the aggregate until applied. Children
+    // must be cloned before inheriting one so shared versions keep their values.
     fn push(&mut self, curr_node: usize, range: RangeInclusive<usize>) {
-        if self.nodes[curr_node].pending().is_some() && range.start != range.last {
+        if self.nodes[curr_node].pending().is_none() {
+            return;
+        }
+        if range.start != range.last {
             let left_node = self.nodes.len();
             let right_node = self.nodes.len() + 1;
             self.nodes.push(
@@ -147,9 +168,17 @@ where
         }
     }
 
-    /// Creates a new segment tree version from version were the p-th element of the segment tree to value T and update the segment tree correspondingly.
-    // It will panic if p is not in `[0,n)`, or if version is not in <code>[0,[versions](Self::versions))</code>
-    /// It has time complexity of `O(log(n))`, assuming that [`combine`](Node::combine), [`update_update`](LazyNode::update_update) and [`lazy_update`](LazyNode::lazy_update) have constant time complexity.
+    /// Creates a new segment tree version by applying `value` to the inclusive range `[left, right]` in `version`.
+    ///
+    /// The new version has index `self.versions() - 1` after the call; existing
+    /// versions retain their values.
+    ///
+    /// Takes `O(log(n + 1))` time, assuming cloning, [`combine`](Node::combine),
+    /// [`defer`](LazyNode::defer), and [`apply_pending`](LazyNode::apply_pending)
+    /// take constant time.
+    ///
+    /// # Panics
+    /// Panics if `version` is not in `0..self.versions()`.
     pub fn update(
         &mut self,
         version: usize,
@@ -180,6 +209,9 @@ where
         index_range: RangeInclusive<usize>,
     ) -> usize {
         if index_range.last < query_range.start || query_range.last < index_range.start {
+            // This sibling may be untouched by the new update, but its aggregate
+            // must include any older pending update before the parent combines it.
+            self.push(curr_node, index_range);
             return curr_node;
         }
         let x = self.nodes.len();
@@ -189,6 +221,7 @@ where
             self.push(x, index_range);
             return x;
         }
+        self.push(x, index_range);
         let mid = usize::midpoint(index_range.start, index_range.last);
         let left_node = self.update_helper(
             self.nodes[x].left_child().unwrap().get(),
@@ -213,17 +246,34 @@ where
         x
     }
 
-    /// Returns the amount of different versions the current segment tree has. Essentially this will be how many calls to [`update`](Self::update) have happened.
+    /// Returns the number of versions available.
+    ///
+    /// Building from a nonempty slice creates one version; an empty slice creates
+    /// none. Each successful [`update`](Self::update) adds one version.
+    /// Queries and prefix searches do not add versions.
     #[allow(clippy::must_use_candidate)]
     pub const fn versions(&self) -> usize {
         self.roots.len()
     }
 
-    /// A method that finds the smallest prefix[^note] `u` such that `predicate(u.value(), value)` is `true`. The following must be true:
+    /// Returns the zero-based last index of the smallest nonempty prefix[^note]
+    /// `u` in `version` such that `predicate(u.value(), value)` is `true`.
+    ///
+    /// A matching prefix must exist: this API cannot represent a missing match
+    /// and falls through to the last index if no prefix matches.
+    /// The following must be true:
     /// - `predicate` is monotonic over prefixes[^note2].
     /// - `g` will satisfy the following, given segments `[i,j]` and `[i,k]` with `j<k` we have that `predicate([i,k].value(),value)` implies `predicate([j+1,k].value(),g([i,j].value(),value))`.
     ///
-    /// These are two examples, the first is finding the smallest prefix which sums at least some value.
+    /// Takes `O(log(n + 1))` time if cloning, lazy-node operations, `predicate`,
+    /// and `g` take constant time. May allocate nodes while materializing pending
+    /// updates, without changing any version's logical values.
+    ///
+    /// # Panics
+    /// Panics if `version` is not in `0..self.versions()` (including an empty tree).
+    ///
+    /// # Examples
+    /// The first example finds the smallest prefix whose sum reaches a target.
     /// ```
     /// # use seg_tree::{LazyPersistent,utils::LazySum ,traits::Node};
     /// let predicate = |left_value: &usize, value: &usize|{ *left_value >= *value }; // Is the sum greater or equal to value?
@@ -236,7 +286,22 @@ where
     /// #    assert_eq!(seg_tree.lower_bound(0, predicate, g, sums[i]), i);
     /// # }
     /// ```
-    /// The second is finding the position of the smallest value greater or equal to some value.
+    /// Searches also respect updates and branches from earlier versions:
+    /// ```
+    /// use seg_tree::{LazyPersistent, traits::Node, utils::LazySum};
+    /// let nodes: Vec<_> = [1usize, 2, 3, 4].iter().map(LazySum::initialize).collect();
+    /// let mut tree = LazyPersistent::build(&nodes);
+    /// tree.update(0, 0, 3, &2); // Version 1: [3, 4, 5, 6].
+    /// tree.update(0, 0, 0, &10); // Version 2 branches from 0: [11, 2, 3, 4].
+    /// let predicate = |sum: &usize, target: &usize| sum >= target;
+    /// let remaining = |sum: &usize, target: usize| target - sum;
+    /// assert_eq!(tree.lower_bound(0, predicate, remaining, 6), 2);
+    /// assert_eq!(tree.lower_bound(1, predicate, remaining, 6), 1);
+    /// assert_eq!(tree.lower_bound(2, predicate, remaining, 6), 0);
+    /// assert_eq!(*tree.query(0, 0, 3).unwrap().value(), 10);
+    /// assert_eq!(tree.versions(), 3);
+    /// ```
+    /// The final example finds the first position whose value is at least a target.
     /// ```
     /// # use seg_tree::{LazyPersistent,utils::{Max, LazySetWrapper},traits::Node};
     /// # type PMax<T> = LazySetWrapper<Max<T>>;
@@ -287,29 +352,21 @@ where
         F: Fn(&<T as Node>::Value, &<T as Node>::Value) -> bool,
         G: Fn(&<T as Node>::Value, <T as Node>::Value) -> <T as Node>::Value,
     {
+        self.push(curr_node, index_range);
         if index_range.start == index_range.last {
             return index_range.start;
         }
         let mid = usize::midpoint(index_range.start, index_range.last);
-        let left_node = if let Some(l) = self.nodes[curr_node].left_child() {
-            l.get()
-        } else {
-            self.push(curr_node, index_range);
-            self.nodes[curr_node].left_child().unwrap().get()
-        };
+        let left_node = self.nodes[curr_node].left_child().unwrap().get();
         let right_node = self.nodes[curr_node].right_child().unwrap().get();
+        let left_range = RangeInclusive {
+            start: index_range.start,
+            last: mid,
+        };
+        self.push(left_node, left_range);
         let left_value = self.nodes[left_node].value();
         if predicate(left_value, &value) {
-            self.lower_bound_helper(
-                left_node,
-                RangeInclusive {
-                    start: index_range.start,
-                    last: mid,
-                },
-                predicate,
-                g,
-                value,
-            )
+            self.lower_bound_helper(left_node, left_range, predicate, g, value)
         } else {
             let value = g(left_value, value);
             self.lower_bound_helper(
@@ -359,7 +416,12 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{segment_tree::lazy_persistent::LazyPersistent, traits::Node, utils::LazySum};
+    use crate::{
+        internal_utils::test_utils::{assert_prefix_search_matches, assert_range_matches},
+        segment_tree::lazy_persistent::LazyPersistent,
+        traits::Node,
+        utils::LazySum,
+    };
     #[test]
     fn non_empty_query_returns_some() {
         let nodes: Vec<LazySum<usize>> = (0..=10).map(|x| LazySum::initialize(&x)).collect();
@@ -414,6 +476,276 @@ mod tests {
         // Original version and neighboring leaves are untouched.
         assert_eq!(segment_tree.query(0, 3, 3).unwrap().value(), &3);
         assert_eq!(segment_tree.query(1, 2, 2).unwrap().value(), &2);
+    }
+
+    #[test]
+    fn chained_update_preserves_pending_sibling() {
+        let nodes = vec![LazySum::<usize>::initialize(&0); 2];
+        let mut segment_tree = LazyPersistent::build(&nodes);
+        segment_tree.update(0, 0, 1, &10);
+        segment_tree.update(1, 0, 0, &5);
+
+        assert_eq!(segment_tree.query(2, 0, 1).unwrap().value(), &25);
+        assert_eq!(segment_tree.query(2, 0, 0).unwrap().value(), &15);
+        assert_eq!(segment_tree.query(2, 1, 1).unwrap().value(), &10);
+        assert_eq!(segment_tree.query(1, 0, 1).unwrap().value(), &20);
+        assert_eq!(segment_tree.query(0, 0, 1).unwrap().value(), &0);
+    }
+
+    #[test]
+    fn lower_bound_after_whole_range_update_uses_pending_values() {
+        let nodes = vec![LazySum::<usize>::initialize(&0); 2];
+        let mut segment_tree = LazyPersistent::build(&nodes);
+        segment_tree.update(0, 0, 1, &10);
+
+        assert_eq!(
+            segment_tree.lower_bound(
+                1,
+                |sum, target| sum >= target,
+                |sum, target| target - sum,
+                5
+            ),
+            0
+        );
+    }
+
+    #[test]
+    fn deeper_updates_preserve_inherited_pending_state() {
+        let nodes = vec![LazySum::<usize>::initialize(&0); 8];
+        let mut segment_tree = LazyPersistent::build(&nodes);
+        segment_tree.update(0, 0, 7, &10);
+        segment_tree.update(1, 0, 3, &5);
+        segment_tree.update(2, 1, 2, &2);
+
+        let expected = [15, 17, 17, 15, 10, 10, 10, 10];
+        assert_range_matches(
+            &expected,
+            |left, right| *segment_tree.query(3, left, right).unwrap().value(),
+            |range| range.iter().sum::<usize>(),
+        );
+    }
+
+    #[test]
+    fn queries_before_chained_update_do_not_change_results() {
+        let nodes = vec![LazySum::<usize>::initialize(&0); 4];
+        let mut unqueried = LazyPersistent::build(&nodes);
+        let mut queried = LazyPersistent::build(&nodes);
+        unqueried.update(0, 0, 3, &10);
+        queried.update(0, 0, 3, &10);
+        for index in (0..4).rev() {
+            assert_eq!(queried.query(1, index, index).unwrap().value(), &10);
+        }
+        unqueried.update(1, 0, 0, &5);
+        queried.update(1, 0, 0, &5);
+
+        let unqueried_sum = *unqueried.query(2, 0, 3).unwrap().value();
+        let queried_sum = *queried.query(2, 0, 3).unwrap().value();
+        assert_eq!(unqueried_sum, queried_sum);
+        assert_eq!(unqueried_sum, 45);
+    }
+
+    #[test]
+    fn lower_bound_is_independent_of_prior_queries() {
+        let nodes = vec![LazySum::<usize>::initialize(&0); 8];
+        let mut unqueried = LazyPersistent::build(&nodes);
+        let mut queried = LazyPersistent::build(&nodes);
+        unqueried.update(0, 0, 7, &10);
+        queried.update(0, 0, 7, &10);
+        for index in (0..8).rev() {
+            assert_eq!(queried.query(1, index, index).unwrap().value(), &10);
+        }
+
+        for target in [5, 10, 11, 40, 41, 80] {
+            let before = unqueried.lower_bound(
+                1,
+                |sum, target| sum >= target,
+                |sum, target| target - sum,
+                target,
+            );
+            let after = queried.lower_bound(
+                1,
+                |sum, target| sum >= target,
+                |sum, target| target - sum,
+                target,
+            );
+            assert_eq!(before, after, "target {target}");
+            assert_eq!(before, (target - 1) / 10, "target {target}");
+        }
+    }
+
+    #[test]
+    fn branches_from_updated_version_preserve_all_versions() {
+        let nodes = vec![LazySum::<usize>::initialize(&0); 4];
+        let mut segment_tree = LazyPersistent::build(&nodes);
+        segment_tree.update(0, 0, 3, &10);
+        segment_tree.update(1, 0, 1, &5);
+        segment_tree.update(1, 2, 3, &7);
+        assert_eq!(segment_tree.versions(), 4);
+
+        let expected = [
+            [0, 0, 0, 0],
+            [10, 10, 10, 10],
+            [15, 15, 10, 10],
+            [10, 10, 17, 17],
+        ];
+        // Visit descendants before their ancestors, then repeat in the opposite order.
+        for version in [3, 2, 1, 0, 0, 1, 2, 3] {
+            assert_range_matches(
+                &expected[version],
+                |left, right| *segment_tree.query(version, left, right).unwrap().value(),
+                |range| range.iter().sum::<usize>(),
+            );
+        }
+        assert_eq!(segment_tree.versions(), 4);
+    }
+
+    #[test]
+    fn branching_updates_and_searches_match_vector_versions() {
+        for n in [1, 2, 3, 5, 8, 9] {
+            let initial: Vec<_> = (0..n).map(|i| i % 4 + 1).collect();
+            let nodes: Vec<_> = initial.iter().map(LazySum::initialize).collect();
+            let mut tree = LazyPersistent::build(&nodes);
+            let mut expected = vec![initial];
+            let mut seed = n as u64;
+            for step in 0..16 {
+                seed = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+                let version = (seed % expected.len() as u64) as usize;
+                let left = (seed % n as u64) as usize;
+                let right = ((seed >> 16) % n as u64) as usize;
+                let (left, right) = match step % 4 {
+                    0 => (0, n - 1),
+                    1 => (left, left),
+                    _ => (left.min(right), left.max(right)),
+                };
+                let delta = (seed % 3 + 1) as usize;
+                if step % 2 == 0 {
+                    assert_eq!(
+                        *tree.query(version, left, left).unwrap().value(),
+                        expected[version][left]
+                    );
+                }
+                let mut next = expected[version].clone();
+                for value in &mut next[left..=right] {
+                    *value += delta;
+                }
+                tree.update(version, left, right, &delta);
+                expected.push(next);
+                assert_eq!(tree.versions(), expected.len());
+            }
+            for _ in 0..2 {
+                for (version, values) in expected.iter().enumerate().rev() {
+                    let total: usize = values.iter().sum();
+                    assert_prefix_search_matches(
+                        values,
+                        [0, 1, total / 2, total],
+                        |target| {
+                            Some(tree.lower_bound(
+                                version,
+                                |sum, target| sum >= target,
+                                |sum, target| target - sum,
+                                *target,
+                            ))
+                        },
+                        |prefix, target| prefix.iter().sum::<usize>() >= *target,
+                    );
+                    assert_range_matches(
+                        values,
+                        |left, right| *tree.query(version, left, right).unwrap().value(),
+                        |range| range.iter().sum::<usize>(),
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn noncommutative_updates_preserve_chronological_order_and_versions() {
+        use crate::traits::LazyNode;
+
+        #[derive(Clone)]
+        struct AffineSum {
+            sum: usize,
+            pending: Option<(usize, usize)>,
+        }
+
+        impl Node for AffineSum {
+            type Value = usize;
+
+            fn initialize(value: &usize) -> Self {
+                Self {
+                    sum: *value,
+                    pending: None,
+                }
+            }
+
+            fn combine(a: &Self, b: &Self) -> Self {
+                Self::initialize(&(a.sum + b.sum))
+            }
+
+            fn value(&self) -> &usize {
+                &self.sum
+            }
+        }
+
+        impl LazyNode for AffineSum {
+            type Update = (usize, usize);
+
+            fn pending(&self) -> Option<&Self::Update> {
+                self.pending.as_ref()
+            }
+
+            fn defer(&mut self, &(mul, add): &Self::Update) {
+                self.pending = Some(match self.pending {
+                    Some((old_mul, old_add)) => (mul * old_mul, mul * old_add + add),
+                    None => (mul, add),
+                });
+            }
+
+            fn apply_pending(&mut self, range: core::range::RangeInclusive<usize>) {
+                if let Some((mul, add)) = self.pending.take() {
+                    self.sum = mul * self.sum + add * (range.last - range.start + 1);
+                }
+            }
+        }
+
+        let nodes: Vec<_> = (1..=5).map(|value| AffineSum::initialize(&value)).collect();
+        let mut tree = LazyPersistent::build(&nodes);
+        tree.update(0, 0, 4, &(1, 3));
+        tree.update(1, 1, 3, &(0, 2));
+        tree.update(1, 2, 4, &(2, 0));
+        tree.update(2, 0, 4, &(2, 1));
+        tree.update(4, 2, 4, &(0, 7));
+        let expected = [
+            vec![1, 2, 3, 4, 5],
+            vec![4, 5, 6, 7, 8],
+            vec![4, 2, 2, 2, 8],
+            vec![4, 5, 12, 14, 16],
+            vec![9, 5, 5, 5, 17],
+            vec![9, 5, 7, 7, 7],
+        ];
+        for _ in 0..2 {
+            for (version, values) in expected.iter().enumerate().rev() {
+                let total: usize = values.iter().sum();
+                assert_prefix_search_matches(
+                    values,
+                    [0, 1, total / 2, total],
+                    |target| {
+                        Some(tree.lower_bound(
+                            version,
+                            |sum, target| sum >= target,
+                            |sum, target| target - sum,
+                            *target,
+                        ))
+                    },
+                    |prefix, target| prefix.iter().sum::<usize>() >= *target,
+                );
+                assert_range_matches(
+                    values,
+                    |left, right| *tree.query(version, left, right).unwrap().value(),
+                    |range| range.iter().sum::<usize>(),
+                );
+            }
+        }
     }
 
     #[test]

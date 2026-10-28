@@ -63,15 +63,15 @@ where
         }
     }
 
-    /// Returns the result from the range `[left,right]`.
-    /// It returns None if and only if range is empty.
-    /// It will **panic** if left or right are not in `[0,n)`.
+    /// Returns the aggregate of the inclusive range `[left, right]` intersected
+    /// with the original slice. Returns `None` if the intersection or tree is empty.
     /// It has time complexity of `O(log(n))`, assuming that [`combine`](Node::combine) has constant time complexity.
-    #[allow(clippy::must_use_candidate)]
+    #[must_use]
     pub fn query(&self, l: usize, r: usize) -> Option<T> {
-        assert!(l < self.n, "query left endpoint out of bounds");
-        assert!(r < self.n, "query right endpoint out of bounds");
-        let (mut l, mut r) = (l, r);
+        if self.n == 0 || l > r || l >= self.n {
+            return None;
+        }
+        let (mut l, mut r) = (l, r.min(self.n - 1));
         let mut ans_left = None;
         let mut ans_right = None;
         l += self.n;
@@ -159,7 +159,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{traits::Node, utils::Min};
+    use crate::{internal_utils::test_utils::assert_range_matches, traits::Node, utils::Min};
 
     use super::Iterative;
 
@@ -204,19 +204,15 @@ mod tests {
                     values[index] = value;
                     tree.update(index, &value);
                 }
-                for left in 0..values.len() {
-                    for right in left..values.len() {
-                        let mut leaves =
-                            values[left..=right].iter().map(MaxSubArraySum::initialize);
+                assert_range_matches(
+                    &values,
+                    |left, right| tree.query(left, right).unwrap(),
+                    |range| {
+                        let mut leaves = range.iter().map(MaxSubArraySum::initialize);
                         let first = leaves.next().unwrap();
-                        let expected = leaves.fold(first, |a, b| MaxSubArraySum::combine(&a, &b));
-                        assert_eq!(
-                            tree.query(left, right).unwrap(),
-                            expected,
-                            "values {values:?}, range [{left}, {right}]"
-                        );
-                    }
-                }
+                        leaves.fold(first, |a, b| MaxSubArraySum::combine(&a, &b))
+                    },
+                );
             }
         }
     }
@@ -242,11 +238,28 @@ mod tests {
             }
         }
 
-        let nodes: Vec<_> = (1..=7)
-            .map(|value| Sum::initialize(&Digits { value, len: 1 }))
-            .collect();
-        let tree = Iterative::build(&nodes);
-        assert_eq!(tree.query(1, 5).unwrap().value().value, 23456);
+        let mut values: Vec<_> = (1..=7).map(|value| Digits { value, len: 1 }).collect();
+        let nodes: Vec<_> = values.iter().map(Sum::initialize).collect();
+        let mut tree = Iterative::build(&nodes);
+        for update in [None, Some((0, 9)), Some((3, 0)), Some((6, 8))] {
+            if let Some((index, value)) = update {
+                values[index] = Digits { value, len: 1 };
+                tree.update(index, &values[index]);
+            }
+            assert_range_matches(
+                &values,
+                |left, right| *tree.query(left, right).unwrap().value(),
+                |range| {
+                    range
+                        .iter()
+                        .copied()
+                        .fold(Digits { value: 0, len: 0 }, |a, b| Digits {
+                            value: a.value * 10 + b.value,
+                            len: a.len + 1,
+                        })
+                },
+            );
+        }
     }
 
     #[test]
@@ -269,17 +282,16 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "query left endpoint out of bounds")]
-    fn query_out_of_bounds_left_panics_even_for_reversed_range() {
+    fn query_out_of_bounds_left_returns_none() {
         let tree = Iterative::build(&[Min::initialize(&0usize)]);
-        tree.query(1, 0);
+        assert!(tree.query(1, 0).is_none());
+        assert!(tree.query(1, usize::MAX).is_none());
     }
 
     #[test]
-    #[should_panic(expected = "query right endpoint out of bounds")]
-    fn query_out_of_bounds_right_panics() {
+    fn query_out_of_bounds_right_is_normalized() {
         let tree = Iterative::build(&[Min::initialize(&0usize)]);
-        tree.query(0, 1);
+        assert_eq!(*tree.query(0, usize::MAX).unwrap().value(), 0);
     }
 
     #[test]

@@ -88,7 +88,7 @@ where
 
     /// Updates the range `[i,j]` with value.
     /// It will panic if `i` or `j` is not in `[0,n)`.
-    /// It has time complexity of `O(log(n))`, assuming that [`combine`](Node::combine), [`update_lazy_value`](LazyNode::update_lazy_value) and [`lazy_update`](LazyNode::lazy_update) have constant time complexity.
+    /// It has time complexity of `O(log(n))`, assuming that [`combine`](Node::combine), [`defer`](LazyNode::defer) and [`apply_pending`](LazyNode::apply_pending) have constant time complexity.
     pub fn update(&mut self, i: usize, j: usize, value: &<T as LazyNode>::Update) {
         self.update_helper(
             RangeInclusive { start: i, last: j },
@@ -161,11 +161,13 @@ where
         unsafe { *nodes[curr_node].assume_init_mut() = replacement };
     }
 
-    /// Returns the result from the range `[left,right]`.
-    /// It returns None if and only if range is empty.
-    /// It will **panic** if `left` or `right` are not in `[0,n)`.
-    /// It has time complexity of `O(log(n))`, assuming that [`combine`](Node::combine), [`update_lazy_value`](LazyNode::update_lazy_value) and [`lazy_update`](LazyNode::lazy_update) have constant time complexity.
+    /// Returns the aggregate of the inclusive range `[left, right]` intersected
+    /// with the original slice. Returns `None` if the intersection or tree is empty.
+    /// It has time complexity of `O(log(n))`, assuming that [`combine`](Node::combine), [`defer`](LazyNode::defer) and [`apply_pending`](LazyNode::apply_pending) have constant time complexity.
     pub fn query(&self, left: usize, right: usize) -> Option<T> {
+        if self.n == 0 {
+            return None;
+        }
         self.query_helper(
             RangeInclusive {
                 start: left,
@@ -481,7 +483,10 @@ where
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "bifurcate")]
+    use crate::internal_utils::test_utils::assert_prefix_search_matches;
     use crate::{
+        internal_utils::test_utils::assert_range_matches,
         traits::Node,
         utils::{LazySetWrapper, Min},
     };
@@ -600,17 +605,34 @@ mod tests {
     }
     #[test]
     fn update_works() {
-        let nodes: Vec<LSMin<usize>> = (0..10).map(|x| LSMin::initialize(&x)).collect();
+        let mut values = [8, 3, 7, 1, 6];
+        let nodes: Vec<LSMin<usize>> = values.iter().map(LSMin::initialize).collect();
         let mut segment_tree = LazyRecursive::build(&nodes);
-        let value = 20;
-        segment_tree.update(0, 9, &value);
-        assert_eq!(segment_tree.query(0, 1).unwrap().value(), &value);
+        for (left, right, value) in [(0, 4, 20), (1, 3, 2), (2, 4, 9), (0, 0, 1), (4, 4, 0)] {
+            segment_tree.update(left, right, &value);
+            values[left..=right].fill(value);
+            assert_range_matches(
+                &values,
+                |left, right| *segment_tree.query(left, right).unwrap().value(),
+                |range| *range.iter().min().unwrap(),
+            );
+        }
     }
     #[test]
     fn query_works() {
-        let nodes: Vec<LSMin<usize>> = (0..10).map(|x| LSMin::initialize(&x)).collect();
-        let segment_tree = LazyRecursive::build(&nodes);
-        assert_eq!(segment_tree.query(1, 9).unwrap().value(), &1);
+        for values in [
+            &[4][..],
+            &[8, 3, 7, 1, 6][..],
+            &[5, 2, 2, 9, 1, 8, 4, 0][..],
+        ] {
+            let nodes: Vec<LSMin<usize>> = values.iter().map(LSMin::initialize).collect();
+            let segment_tree = LazyRecursive::build(&nodes);
+            assert_range_matches(
+                values,
+                |left, right| *segment_tree.query(left, right).unwrap().value(),
+                |range| *range.iter().min().unwrap(),
+            );
+        }
     }
 
     #[test]
@@ -650,7 +672,41 @@ mod tests {
         // down and left unflushed partway
         segment_tree.update(0, 3, &5); // sub-range: +5, lands on a node that
         // may still carry unflushed +10
-        assert_eq!(segment_tree.query(0, 0).unwrap().value(), &15); // 0 + 10 + 5
-        assert_eq!(segment_tree.query(5, 5).unwrap().value(), &15); // 5 + 10, untouched by second update
+        let values: Vec<usize> = (0..8).map(|x| x + 10 + if x < 4 { 5 } else { 0 }).collect();
+        assert_range_matches(
+            &values,
+            |left, right| *segment_tree.query(left, right).unwrap().value(),
+            |range| range.iter().sum::<usize>(),
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "bifurcate")]
+    fn bisect_left_after_lazy_updates() {
+        use bifurcate::Bisectable;
+
+        use crate::utils::LazySum;
+
+        let mut values = [1, 3, 2, 4, 1];
+        let nodes: Vec<LazySum<usize>> = values.iter().map(LazySum::initialize).collect();
+        let mut segment_tree = LazyRecursive::build(&nodes);
+        assert_prefix_search_matches(
+            &values,
+            0..=values.iter().sum::<usize>(),
+            |target| segment_tree.bisect_left(target),
+            |prefix, target| prefix.iter().sum::<usize>() >= *target,
+        );
+        for (left, right, delta) in [(0, 4, 2), (1, 3, 3), (4, 4, 1)] {
+            segment_tree.update(left, right, &delta);
+            for value in &mut values[left..=right] {
+                *value += delta;
+            }
+            assert_prefix_search_matches(
+                &values,
+                0..=values.iter().sum::<usize>(),
+                |target| segment_tree.bisect_left(target),
+                |prefix, target| prefix.iter().sum::<usize>() >= *target,
+            );
+        }
     }
 }

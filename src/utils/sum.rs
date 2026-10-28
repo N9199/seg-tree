@@ -31,6 +31,7 @@ where
     }
 }
 
+/// A range-sum node with lazy updates that add a value to every element in a range.
 #[derive(Debug, Clone)]
 pub struct LazySum<T> {
     value: T,
@@ -65,7 +66,7 @@ where
 }
 /// Implementation for sum range query node, the update adds the value to each item in the range.
 /// It assumes that `a*n`, where a: T and n: usize is well defined and `a*n = a+...+a` with 'n' a.
-/// For non-commutative operations, two things will be true `lazy_value = lazy_value + new_value`.
+/// Pending additions are composed as `existing + incoming`.
 impl<T> LazyNode for LazySum<T>
 where
     T: Add<Output = T> + Mul<usize, Output = T> + Clone,

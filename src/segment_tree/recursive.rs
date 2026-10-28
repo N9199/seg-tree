@@ -108,12 +108,14 @@ where
         unsafe { *self.nodes[curr_node].assume_init_mut() = replacement };
     }
 
-    /// Returns the result from the range `[left,right]`.
-    /// It returns None if and only if range is empty.
-    /// It will **panic** if `left` or `right` are not in [0,n).
+    /// Returns the aggregate of the inclusive range `[left, right]` intersected
+    /// with the original slice. Returns `None` if the intersection or tree is empty.
     /// It has time complexity of `O(log(n))`, assuming that [`combine`](Node::combine) has constant time complexity.
     #[allow(clippy::must_use_candidate)]
     pub fn query(&self, left: usize, right: usize) -> Option<T> {
+        if self.n == 0 {
+            return None;
+        }
         self.query_helper(left, right, 0, 0, self.n - 1)
     }
 
@@ -345,7 +347,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{traits::Node, utils::Min};
+    #[cfg(feature = "bifurcate")]
+    use crate::internal_utils::test_utils::assert_prefix_search_matches;
+    use crate::{internal_utils::test_utils::assert_range_matches, traits::Node, utils::Min};
 
     use super::Recursive;
 
@@ -479,17 +483,34 @@ mod tests {
     }
     #[test]
     fn update_works() {
-        let nodes: Vec<Min<usize>> = (0..=10).map(|x| Min::initialize(&x)).collect();
+        let mut values = [8, 3, 7, 1, 6];
+        let nodes: Vec<Min<usize>> = values.iter().map(Min::initialize).collect();
         let mut segment_tree = Recursive::build(&nodes);
-        let value = 20;
-        segment_tree.update(0, &value);
-        assert_eq!(segment_tree.query(0, 0).unwrap().value(), &value);
+        for (index, value) in [(0, 20), (4, 0), (2, 2), (4, 9), (0, 1)] {
+            segment_tree.update(index, &value);
+            values[index] = value;
+            assert_range_matches(
+                &values,
+                |left, right| *segment_tree.query(left, right).unwrap().value(),
+                |range| *range.iter().min().unwrap(),
+            );
+        }
     }
     #[test]
     fn query_works() {
-        let nodes: Vec<Min<usize>> = (0..=10).map(|x| Min::initialize(&x)).collect();
-        let segment_tree = Recursive::build(&nodes);
-        assert_eq!(segment_tree.query(1, 10).unwrap().value(), &1);
+        for values in [
+            &[4][..],
+            &[8, 3, 7, 1, 6][..],
+            &[5, 2, 2, 9, 1, 8, 4, 0][..],
+        ] {
+            let nodes: Vec<Min<usize>> = values.iter().map(Min::initialize).collect();
+            let segment_tree = Recursive::build(&nodes);
+            assert_range_matches(
+                values,
+                |left, right| *segment_tree.query(left, right).unwrap().value(),
+                |range| *range.iter().min().unwrap(),
+            );
+        }
     }
 
     #[test]
@@ -509,11 +530,15 @@ mod tests {
 
         use crate::utils::Max;
 
-        let nodes: Vec<Max<usize>> = (0..=10).map(|x| Max::initialize(&x)).collect();
+        let values = [0, 2, 2, 5, 3, 8, 6, 10, 10, 9, 7];
+        let nodes: Vec<Max<usize>> = values.iter().map(Max::initialize).collect();
         let segment_tree = Recursive::build(&nodes);
-        let value = 5;
-        let found = segment_tree.bisect_left(&value).unwrap();
-        assert_eq!(found, 5);
+        assert_prefix_search_matches(
+            &values,
+            0..=10,
+            |target| segment_tree.bisect_left(target),
+            |prefix, target| prefix.iter().max().unwrap() >= target,
+        );
     }
 
     #[test]

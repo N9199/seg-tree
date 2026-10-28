@@ -322,7 +322,7 @@ fn lazy_tree_drops_safely_after_a_replaced_node_destructor_panics() {
 // native undefined behavior. Disable debug assertions and overflow checks.
 #[cfg(all(miri, not(debug_assertions)))]
 #[test]
-fn iterative_wrapping_update_index_panics_without_reading_uninitialized_storage() {
+fn iterative_wrapping_update_index_preserves_initialized_storage() {
     let counts = Rc::new(Counts::default());
     let values = inputs(&counts, 1);
     let mut tree = Iterative::build(&values);
@@ -330,16 +330,24 @@ fn iterative_wrapping_update_index_panics_without_reading_uninitialized_storage(
         number: 2,
         counts: Rc::clone(&counts),
     };
-    let result = catch_unwind(AssertUnwindSafe(|| tree.update(usize::MAX, &replacement)));
-    assert!(result.is_err());
+    // Checked rejection and a no-op must both preserve the initialized leaf.
+    let _ = catch_unwind(AssertUnwindSafe(|| tree.update(usize::MAX, &replacement)));
+    assert_eq!(tree.query(0, 0).unwrap().value().number, 1);
+    drop(tree);
+    drop(values);
+    assert_all_dropped(&counts);
 }
 
 #[cfg(all(miri, not(debug_assertions)))]
 #[test]
-fn iterative_wrapping_query_index_panics_without_reading_uninitialized_storage() {
+fn iterative_wrapping_query_indices_are_normalized_without_reading_uninitialized_storage() {
     let counts = Rc::new(Counts::default());
     let values = inputs(&counts, 1);
     let tree = Iterative::build(&values);
-    let result = catch_unwind(AssertUnwindSafe(|| tree.query(usize::MAX, 0)));
-    assert!(result.is_err());
+    assert!(tree.query(usize::MAX, 0).is_none());
+    assert!(tree.query(usize::MAX, usize::MAX).is_none());
+    assert_eq!(tree.query(0, usize::MAX).unwrap().value().number, 1);
+    drop(tree);
+    drop(values);
+    assert_all_dropped(&counts);
 }
