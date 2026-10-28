@@ -10,10 +10,13 @@
 //!
 //! # Panic safety
 //!
-//! If a node's constructor, clone, combination, lazy-update operation, or destructor
-//! panics, resources may leak. A tree whose update panicked may retain partially
-//! updated aggregates; no transactional rollback is promised. Destruction and other
-//! safe operations must remain memory-safe, even after a caught panic.
+//! If cloning or combining a node panics during tree construction, all nodes
+//! initialized so far are destroyed, provided their destructors do not panic.
+//! A tree whose update panicked may retain partially updated aggregates; no
+//! transactional rollback is promised. If a node's destructor panics while a tree
+//! is being destroyed, the remaining nodes are still destroyed. A second destructor
+//! panic during unwinding can abort the process. Destruction and other safe
+//! operations remain memory-safe, even after a caught panic.
 //!
 //! <br>
 #![warn(clippy::all)]

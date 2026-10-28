@@ -1,4 +1,4 @@
-use core::mem::MaybeUninit;
+use core::mem::{DropGuard, MaybeUninit};
 
 use crate::{internal_utils::dbg_utils::as_dbg_tree, traits::Node};
 
@@ -23,17 +23,26 @@ where
         let mut nodes: Vec<MaybeUninit<T>> = Vec::with_capacity(2 * n);
         // SAFETY: Uninitialized slots are valid MaybeUninit<T> values.
         unsafe { nodes.set_len(2 * n) };
+        let mut guard = DropGuard::new((nodes, n..n), |(mut nodes, initialized)| {
+            for node in &mut nodes[initialized] {
+                // SAFETY: The range advances only after a slot is initialized.
+                unsafe { node.assume_init_drop() };
+            }
+        });
         for i in 0..n {
-            nodes[i + n].write(values[i].clone());
+            guard.0[i + n].write(values[i].clone());
+            guard.1.end = i + n + 1;
         }
         for i in (1..n).rev() {
-            let (bottom_nodes, top_nodes) = nodes.split_at_mut(i + 1);
+            let (bottom_nodes, top_nodes) = guard.0.split_at_mut(i + 1);
             bottom_nodes[i].write(Node::combine(
                 unsafe { top_nodes[i - 1].assume_init_ref() },
                 unsafe { top_nodes[i].assume_init_ref() },
             ));
+            guard.1.start = i;
         }
 
+        let (nodes, _) = DropGuard::dismiss(guard);
         Self { nodes, n }
     }
 
@@ -111,9 +120,11 @@ where
 
 impl<T> Drop for Iterative<T> {
     fn drop(&mut self) {
-        for node in self.nodes.iter_mut().skip(1) {
-            // SAFETY: Every slot except zero is initialized, even after an update panics.
-            unsafe { node.assume_init_drop() };
+        if let Some(nodes) = self.nodes.get_mut(1..) {
+            // SAFETY: Every slot except zero is initialized, even after an update
+            // panics, and MaybeUninit<T> has the same layout as T. Slice drop glue
+            // also destroys the remaining elements if one destructor panics.
+            unsafe { core::ptr::drop_in_place(core::ptr::from_mut(nodes) as *mut [T]) };
         }
     }
 }

@@ -1,4 +1,4 @@
-use core::mem::MaybeUninit;
+use core::mem::{DropGuard, MaybeUninit};
 #[cfg(feature = "bifurcate")]
 use core::ops::Range;
 use std::{range::RangeInclusive, sync::Mutex};
@@ -53,12 +53,22 @@ where
         let left_node = 2 * curr_node + 1;
         let right_node = 2 * curr_node + 2;
         Self::build_helper(left_node, i, mid, values, nodes);
-        Self::build_helper(right_node, mid + 1, j, values, nodes);
-        let (top_nodes, bottom_nodes) = nodes.split_at_mut(curr_node + 1);
+        let mut guard = DropGuard::new((nodes, false), |(nodes, right_initialized)| {
+            Self::drop_helper(left_node, i, mid, nodes);
+            if right_initialized {
+                Self::drop_helper(right_node, mid + 1, j, nodes);
+            }
+        });
+        // A failing recursive call cleans its own partial subtree. The guard
+        // owns the completed left subtree, and then both completed children.
+        Self::build_helper(right_node, mid + 1, j, values, guard.0);
+        guard.1 = true;
+        let (top_nodes, bottom_nodes) = guard.0.split_at_mut(curr_node + 1);
         top_nodes[curr_node].write(Node::combine(
             unsafe { bottom_nodes[left_node - curr_node - 1].assume_init_ref() },
             unsafe { bottom_nodes[right_node - curr_node - 1].assume_init_ref() },
         ));
+        let _ = DropGuard::dismiss(guard);
     }
 
     fn push(&self, u: usize, range: RangeInclusive<usize>) {
@@ -237,15 +247,20 @@ where
 impl<T> LazyRecursive<T> {
     #[inline]
     fn drop_helper(curr_node: usize, i: usize, j: usize, nodes: &mut [MaybeUninit<T>]) {
+        let mut parent_guard = DropGuard::new(nodes, |nodes| {
+            // SAFETY: This reachable node is initialized and dropped exactly once,
+            // after its children, including when a child's destructor panics.
+            unsafe { nodes[curr_node].assume_init_drop() };
+        });
         if i < j {
             let mid = usize::midpoint(i, j);
             let left_node = 2 * curr_node + 1;
             let right_node = 2 * curr_node + 2;
-            Self::drop_helper(left_node, i, mid, nodes);
-            Self::drop_helper(right_node, mid + 1, j, nodes);
+            let mut right_guard = DropGuard::new(&mut **parent_guard, |nodes| {
+                Self::drop_helper(right_node, mid + 1, j, nodes);
+            });
+            Self::drop_helper(left_node, i, mid, &mut right_guard);
         }
-        // SAFETY: Only initialized nodes are visited, each exactly once.
-        unsafe { nodes[curr_node].assume_init_drop() };
     }
 }
 
