@@ -76,7 +76,7 @@ impl<T: LazyNode + Clone> LazyRecursive<T> {
         );
         let (parent_slice, sons_slice) = nodes.split_at_mut(u + 1);
         if let Some(value) = parent_slice[u].pending()
-            && !range.is_empty()
+            && range.start != range.last
         {
             sons_slice[u].defer(value); // At 2*u + 1 - (u + 1)
             sons_slice[u + 1].defer(value); // At 2*u + 2 - (u + 1)
@@ -479,6 +479,21 @@ mod tests {
         let nodes: Vec<LSMin<usize>> = (0..10).map(|x| LSMin::initialize(&x)).collect();
         let segment_tree = LazyRecursive::build(&nodes);
         assert_eq!(segment_tree.query(1, 9).unwrap().value(), &1);
+    }
+
+    #[test]
+    fn leaf_update_works() {
+        // Regression test: a range update landing exactly on a single leaf
+        // (i == j) used to panic in `push`. `!range.is_empty()` is true for
+        // a single-point range even though a leaf has no children to push
+        // into, since `build_helper` never calls `set_children` on one.
+        let nodes: Vec<LSMin<usize>> = (0..10).map(|x| LSMin::initialize(&x)).collect();
+        let mut segment_tree = LazyRecursive::build(&nodes);
+        let value = 20;
+        segment_tree.update(3, 3, &value);
+        assert_eq!(segment_tree.query(3, 3).unwrap().value(), &value);
+        assert_eq!(segment_tree.query(2, 2).unwrap().value(), &2);
+        assert_eq!(segment_tree.query(4, 4).unwrap().value(), &4);
     }
 
     #[test]

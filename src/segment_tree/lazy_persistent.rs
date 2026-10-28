@@ -78,7 +78,7 @@ where
     }
 
     fn push(&mut self, curr_node: usize, range: RangeInclusive<usize>) {
-        if self.nodes[curr_node].pending().is_some() && !range.is_empty() {
+        if self.nodes[curr_node].pending().is_some() && range.start != range.last {
             let left_node = self.nodes.len();
             let right_node = self.nodes.len() + 1;
             self.nodes.push(
@@ -397,6 +397,23 @@ mod tests {
         let nodes: Vec<LazySum<usize>> = (0..=10).map(|x| LazySum::initialize(&x)).collect();
         let mut segment_tree = LazyPersistent::build(&nodes);
         assert_eq!(segment_tree.query(0, 0, 10).unwrap().value(), &55);
+    }
+
+    #[test]
+    fn leaf_update_works() {
+        // Regression test: a range update landing exactly on a single leaf
+        // (left == right) used to panic in `push`, since a leaf's
+        // `left_child()`/`right_child()` are `None` and `push` wrongly
+        // treated any non-`is_empty` range, including a single point, as
+        // having children to descend into.
+        let nodes: Vec<LazySum<usize>> = (0..=10).map(|x| LazySum::initialize(&x)).collect();
+        let mut segment_tree = LazyPersistent::build(&nodes);
+        let value = 20;
+        segment_tree.update(0, 3, 3, &value);
+        assert_eq!(segment_tree.query(1, 3, 3).unwrap().value(), &(3 + value));
+        // Original version and neighboring leaves are untouched.
+        assert_eq!(segment_tree.query(0, 3, 3).unwrap().value(), &3);
+        assert_eq!(segment_tree.query(1, 2, 2).unwrap().value(), &2);
     }
 
     #[test]
