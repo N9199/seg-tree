@@ -8,6 +8,13 @@
 //!
 //! This library provides simple and easy to use segment trees and some variations of them, by simply implementing certain traits. It also gives some already implemented nodes types, which serve can also serve as examples.
 //!
+//! # Panic safety
+//!
+//! If a node's constructor, clone, combination, lazy-update operation, or destructor
+//! panics, resources may leak. A tree whose update panicked may retain partially
+//! updated aggregates; no transactional rollback is promised. Destruction and other
+//! safe operations must remain memory-safe, even after a caught panic.
+//!
 //! <br>
 #![warn(clippy::all)]
 #![warn(clippy::pedantic)]

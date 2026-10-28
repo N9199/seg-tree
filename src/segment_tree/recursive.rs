@@ -13,7 +13,8 @@ It uses `O(n)` space, assuming that each node uses `O(1)` space.
 Note if you don't need to use `lower_bound`, just use [`Iterative`](crate::segment_tree::Iterative) it uses half the memory and it's more performant.
 */
 pub struct Recursive<T> {
-    nodes: Vec<T>,
+    // Only nodes reachable from the root for [0, n) are initialized.
+    nodes: Vec<MaybeUninit<T>>,
     n: usize,
 }
 
@@ -36,13 +37,6 @@ where
         // SAFETY: As the nodes are of type `MaybeUninit<T>` this is safe.
         unsafe { nodes.set_len(4 * n) };
         Self::build_helper(0, 0, n - 1, values, &mut nodes);
-        let ptr = nodes.as_mut_ptr();
-        let len = nodes.len();
-        let cap = nodes.capacity();
-        debug_assert_eq!(len, cap);
-        debug_assert_eq!(len, 4 * n);
-        core::mem::forget(nodes);
-        let nodes = unsafe { Vec::from_raw_parts(ptr.cast::<T>(), len, cap) }; // Unsafe AF, but if it's coded correctly the only nodes which will ever be accessed are already initialized
 
         Self { nodes, n }
     }
@@ -91,7 +85,10 @@ where
             return;
         }
         if i == j {
-            self.nodes[curr_node] = Node::initialize(value);
+            let replacement = Node::initialize(value);
+            // SAFETY: This reachable leaf was initialized by build_helper. Assignment
+            // installs the replacement even if dropping the previous value panics.
+            unsafe { *self.nodes[curr_node].assume_init_mut() = replacement };
             return;
         }
         let mid = usize::midpoint(i, j);
@@ -99,7 +96,16 @@ where
         let right_node = 2 * curr_node + 2;
         self.update_helper(p, value, left_node, i, mid);
         self.update_helper(p, value, right_node, mid + 1, j);
-        self.nodes[curr_node] = Node::combine(&self.nodes[left_node], &self.nodes[right_node]);
+        // SAFETY: Both children are reachable nodes initialized by build_helper.
+        let replacement = unsafe {
+            Node::combine(
+                self.nodes[left_node].assume_init_ref(),
+                self.nodes[right_node].assume_init_ref(),
+            )
+        };
+        // SAFETY: This reachable parent is initialized, including after a prior
+        // assignment unwound while dropping its old value.
+        unsafe { *self.nodes[curr_node].assume_init_mut() = replacement };
     }
 
     /// Returns the result from the range `[left,right]`.
@@ -127,7 +133,8 @@ where
         let left_node = 2 * curr_node + 1;
         let right_node = 2 * curr_node + 2;
         if left <= i && j <= right {
-            return Some(self.nodes[curr_node].clone());
+            // SAFETY: The query follows only reachable nodes initialized by build_helper.
+            return Some(unsafe { self.nodes[curr_node].assume_init_ref() }.clone());
         }
         match (
             self.query_helper(left, right, left_node, i, mid),
@@ -141,6 +148,30 @@ where
     }
 }
 
+impl<T> Recursive<T> {
+    #[inline]
+    fn drop_helper(curr_node: usize, i: usize, j: usize, nodes: &mut [MaybeUninit<T>]) {
+        if i < j {
+            let mid = usize::midpoint(i, j);
+            let left_node = 2 * curr_node + 1;
+            let right_node = 2 * curr_node + 2;
+            Self::drop_helper(left_node, i, mid, nodes);
+            Self::drop_helper(right_node, mid + 1, j, nodes);
+        }
+        // SAFETY: Only reachable, initialized nodes are visited, each exactly once.
+        unsafe { nodes[curr_node].assume_init_drop() };
+    }
+}
+
+impl<T> Drop for Recursive<T> {
+    fn drop(&mut self) {
+        if self.n == 0 {
+            return;
+        }
+        Self::drop_helper(0, 0, self.n - 1, &mut self.nodes);
+    }
+}
+
 impl<T> core::fmt::Debug for Recursive<T>
 where
     T: core::fmt::Debug,
@@ -151,7 +182,11 @@ where
             .field(
                 "nodes",
                 &as_dbg_tree(&self.nodes, |nodes, f| {
-                    recursive_visitor(0, 0, self.n - 1, f, nodes);
+                    if self.n > 0 {
+                        // SAFETY: build_helper initialized every node reachable by this
+                        // traversal; unused slots are never visited.
+                        unsafe { recursive_visitor(0, 0, self.n - 1, f, nodes) };
+                    }
                 }),
             )
             .finish()
@@ -186,7 +221,8 @@ where
         let mid = usize::mid_point(&i, &j)?;
         let left_node_index = 2 * curr_node_index + 1;
         let right_node_index = 2 * curr_node_index + 2;
-        let left_node = self.nodes.get(left_node_index)?;
+        // SAFETY: This is the reachable left child of a non-leaf node.
+        let left_node = unsafe { self.nodes.get(left_node_index)?.assume_init_ref() };
         let temp_node = carry_node
             .as_ref()
             .map_or_else(|| (*left_node).clone(), |v| T::combine(v, left_node));
@@ -219,7 +255,8 @@ where
         let mid = usize::mid_point(&i, &j)?;
         let left_node_index = 2 * curr_node_index + 1;
         let right_node_index = 2 * curr_node_index + 2;
-        let left_node = self.nodes.get(left_node_index)?;
+        // SAFETY: This is the reachable left child of a non-leaf node.
+        let left_node = unsafe { self.nodes.get(left_node_index)?.assume_init_ref() };
         let temp_node = carry_node
             .as_ref()
             .map_or_else(|| (*left_node).clone(), |v| T::combine(v, left_node));
@@ -250,7 +287,8 @@ where
         let mid = usize::mid_point(&i, &j)?;
         let left_node_index = 2 * curr_node_index + 1;
         let right_node_index = 2 * curr_node_index + 2;
-        let left_node = self.nodes.get(left_node_index)?;
+        // SAFETY: This is the reachable left child of a non-leaf node.
+        let left_node = unsafe { self.nodes.get(left_node_index)?.assume_init_ref() };
         let temp_node = carry_node
             .as_ref()
             .map_or_else(|| (*left_node).clone(), |v| T::combine(v, left_node));
@@ -310,6 +348,122 @@ mod tests {
     use crate::{traits::Node, utils::Min};
 
     use super::Recursive;
+
+    #[cfg(miri)]
+    #[derive(Clone)]
+    struct DropNode(Box<usize>);
+
+    #[cfg(miri)]
+    impl Node for DropNode {
+        type Value = usize;
+
+        fn initialize(value: &usize) -> Self {
+            Self(Box::new(*value))
+        }
+
+        fn combine(a: &Self, b: &Self) -> Self {
+            Self::initialize(&(*a.0 + *b.0))
+        }
+
+        fn value(&self) -> &usize {
+            &self.0
+        }
+    }
+
+    #[cfg(miri)]
+    impl Drop for DropNode {
+        fn drop(&mut self) {
+            // Read the owned allocation so dropping an uninitialized slot cannot
+            // be optimized into a no-op.
+            std::hint::black_box(*self.0);
+        }
+    }
+
+    #[test]
+    fn drop_empty_tree_does_not_panic() {
+        drop(Recursive::<Min<usize>>::build(&[]));
+    }
+
+    #[cfg(miri)]
+    #[test]
+    fn miri_drop_owned_nodes() {
+        for len in [0, 1, 5] {
+            let nodes: Vec<_> = (0..len).map(|x| DropNode::initialize(&x)).collect();
+            let tree = Recursive::build(&nodes);
+            // Drop only reachable nodes, leaving uninitialized storage untouched.
+            drop(tree);
+        }
+    }
+
+    #[test]
+    fn update_drop_panic_leaves_initialized_nodes() {
+        use std::{
+            cell::Cell,
+            panic::{AssertUnwindSafe, catch_unwind},
+            rc::Rc,
+        };
+
+        #[derive(Clone, Debug)]
+        struct PanicNode {
+            value: Box<usize>,
+            panic_on: Rc<Cell<Option<usize>>>,
+        }
+
+        impl Node for PanicNode {
+            type Value = (usize, Rc<Cell<Option<usize>>>);
+
+            fn initialize(value: &Self::Value) -> Self {
+                Self {
+                    value: Box::new(value.0),
+                    panic_on: value.1.clone(),
+                }
+            }
+
+            fn combine(a: &Self, b: &Self) -> Self {
+                Self::initialize(&(*a.value + *b.value, a.panic_on.clone()))
+            }
+
+            fn value(&self) -> &Self::Value {
+                unreachable!("this regression does not use Node::value")
+            }
+        }
+
+        impl Drop for PanicNode {
+            fn drop(&mut self) {
+                if self.panic_on.get() == Some(*self.value) {
+                    self.panic_on.set(None);
+                    panic!("node destructor panic");
+                }
+            }
+        }
+
+        // Exercise replacement of both a leaf and its parent in a tree with holes.
+        for panic_value in [1, 3] {
+            let panic_on = Rc::new(Cell::new(None));
+            let nodes: Vec<_> = (1..=5)
+                .map(|value| PanicNode::initialize(&(value, panic_on.clone())))
+                .collect();
+            let mut tree = Recursive::build(&nodes);
+            panic_on.set(Some(panic_value));
+            assert!(
+                catch_unwind(AssertUnwindSafe(|| {
+                    tree.update(0, &(10, panic_on.clone()));
+                }))
+                .is_err()
+            );
+            assert_eq!(*tree.query(0, 0).unwrap().value, 10);
+            assert!(!format!("{tree:?}").is_empty());
+            drop(tree);
+        }
+    }
+
+    #[test]
+    fn dbg_empty_tree() {
+        assert_eq!(
+            format!("{:?}", Recursive::<Min<usize>>::build(&[])),
+            "Recursive { n: 0, nodes: {} }"
+        );
+    }
 
     #[test]
     fn non_empty_query_returns_some() {

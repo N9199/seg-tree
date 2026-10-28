@@ -7,7 +7,8 @@ use crate::{internal_utils::dbg_utils::as_dbg_tree, traits::Node};
 /// It uses `O(n)` space, assuming that each node uses `O(1)` space.
 /// Note if you need to use `lower_bound`, just use [`Recursive`](crate::segment_tree::Recursive) it uses double the memory though and it's less performant.
 pub struct Iterative<T> {
-    nodes: Vec<T>,
+    // Slot zero is uninitialized; every other slot is initialized in a built tree.
+    nodes: Vec<MaybeUninit<T>>,
     n: usize,
 }
 
@@ -20,6 +21,7 @@ where
     pub fn build(values: &[T]) -> Self {
         let n = values.len();
         let mut nodes: Vec<MaybeUninit<T>> = Vec::with_capacity(2 * n);
+        // SAFETY: Uninitialized slots are valid MaybeUninit<T> values.
         unsafe { nodes.set_len(2 * n) };
         for i in 0..n {
             nodes[i + n].write(values[i].clone());
@@ -31,13 +33,7 @@ where
                 unsafe { top_nodes[i].assume_init_ref() },
             ));
         }
-        let ptr = nodes.as_mut_ptr();
-        let len = nodes.len();
-        let cap = nodes.capacity();
-        debug_assert_eq!(len, cap);
-        debug_assert_eq!(len, 2 * n);
-        core::mem::forget(nodes);
-        let nodes = unsafe { Vec::from_raw_parts(ptr.cast(), len, cap) };
+
         Self { nodes, n }
     }
 
@@ -45,12 +41,24 @@ where
     /// It will panic if i is not in `[0,n)`
     /// It has time complexity of `O(log(n))`, assuming that [`combine`](Node::combine) has constant time complexity.
     pub fn update(&mut self, i: usize, value: &<T as Node>::Value) {
+        assert!(i < self.n, "update index out of bounds");
         let mut i = i;
         i += self.n;
-        self.nodes[i] = Node::initialize(value);
+        let value = Node::initialize(value);
+        // SAFETY: The bounds check selects an initialized leaf.
+        unsafe { *self.nodes[i].assume_init_mut() = value };
         i >>= 1;
         while i > 0 {
-            self.nodes[i] = Node::combine(&self.nodes[2 * i], &self.nodes[2 * i + 1]);
+            // SAFETY: Both children of this internal node are initialized.
+            let value = unsafe {
+                Node::combine(
+                    self.nodes[2 * i].assume_init_ref(),
+                    self.nodes[2 * i + 1].assume_init_ref(),
+                )
+            };
+            // SAFETY: This internal slot is initialized. Assignment keeps it
+            // initialized even if the old node's destructor panics.
+            unsafe { *self.nodes[i].assume_init_mut() = value };
             i >>= 1;
         }
     }
@@ -61,6 +69,8 @@ where
     /// It has time complexity of `O(log(n))`, assuming that [`combine`](Node::combine) has constant time complexity.
     #[allow(clippy::must_use_candidate)]
     pub fn query(&self, l: usize, r: usize) -> Option<T> {
+        assert!(l < self.n, "query left endpoint out of bounds");
+        assert!(r < self.n, "query right endpoint out of bounds");
         let (mut l, mut r) = (l, r);
         let mut ans_left = None;
         let mut ans_right = None;
@@ -68,17 +78,21 @@ where
         r += self.n + 1;
         while l < r {
             if l & 1 != 0 {
+                // SAFETY: The query traversal selects an initialized slot.
+                let selected = unsafe { self.nodes[l].assume_init_ref() };
                 ans_left = Some(ans_left.map_or_else(
-                    || Node::initialize(self.nodes[l].value()),
-                    |node| Node::combine(&node, &self.nodes[l]),
+                    || Node::initialize(selected.value()),
+                    |node| Node::combine(&node, selected),
                 ));
                 l += 1;
             }
             if r & 1 != 0 {
                 r -= 1;
+                // SAFETY: The query traversal selects an initialized slot.
+                let selected = unsafe { self.nodes[r].assume_init_ref() };
                 ans_right = Some(ans_right.map_or_else(
-                    || Node::initialize(self.nodes[r].value()),
-                    |node| Node::combine(&self.nodes[r], &node),
+                    || Node::initialize(selected.value()),
+                    |node| Node::combine(selected, &node),
                 ));
             }
             l >>= 1;
@@ -93,20 +107,37 @@ where
     }
 }
 
+impl<T> Drop for Iterative<T> {
+    fn drop(&mut self) {
+        for node in self.nodes.iter_mut().skip(1) {
+            // SAFETY: Every slot except zero is initialized, even after an update panics.
+            unsafe { node.assume_init_drop() };
+        }
+    }
+}
+
 impl<T> Iterative<T>
 where
     T: Node + core::fmt::Debug,
 {
-    fn dbg_visitor<'a>(n: usize, f: &mut dyn FnMut(usize, usize, &'a T), nodes: &'a [T]) {
+    fn dbg_visitor<'a>(
+        n: usize,
+        f: &mut dyn FnMut(usize, usize, &'a T),
+        nodes: &'a [MaybeUninit<T>],
+    ) {
         let mut segments = vec![(0, 0); 2 * n];
         for i in 0..n {
             segments[i + n] = (i, i);
-            f(i, i, &nodes[n + i]);
+            // SAFETY: Each leaf is initialized.
+            f(i, i, unsafe { nodes[n + i].assume_init_ref() });
         }
         let helper = |(a1, b1): (usize, usize), (a2, b2)| (a1.min(a2), b1.max(b2));
         for i in (1..n).rev() {
             segments[i] = helper(segments[2 * i], segments[2 * i + 1]);
-            f(segments[i].0, segments[i].1, &nodes[i]);
+            // SAFETY: Each internal slot in 1..n is initialized.
+            f(segments[i].0, segments[i].1, unsafe {
+                nodes[i].assume_init_ref()
+            });
         }
     }
 }
@@ -145,6 +176,27 @@ mod tests {
         assert!(segment_tree.query(10, 0).is_none());
     }
     #[test]
+    #[should_panic(expected = "update index out of bounds")]
+    fn update_out_of_bounds_panics() {
+        let mut tree = Iterative::build(&[Min::initialize(&0usize)]);
+        tree.update(1, &1);
+    }
+
+    #[test]
+    #[should_panic(expected = "query left endpoint out of bounds")]
+    fn query_out_of_bounds_left_panics_even_for_reversed_range() {
+        let tree = Iterative::build(&[Min::initialize(&0usize)]);
+        tree.query(1, 0);
+    }
+
+    #[test]
+    #[should_panic(expected = "query right endpoint out of bounds")]
+    fn query_out_of_bounds_right_panics() {
+        let tree = Iterative::build(&[Min::initialize(&0usize)]);
+        tree.query(0, 1);
+    }
+
+    #[test]
     fn update_works() {
         let nodes: Vec<Min<usize>> = (0..=10).map(|x| Min::initialize(&x)).collect();
         let mut segment_tree = Iterative::build(&nodes);
@@ -158,6 +210,86 @@ mod tests {
         let segment_tree = Iterative::build(&nodes);
         for i in 0..10 {
             assert_eq!(segment_tree.query(i, 10).unwrap().value(), &i);
+        }
+    }
+
+    #[test]
+    fn drop_empty_tree_does_not_panic() {
+        drop(Iterative::<Min<usize>>::build(&[]));
+    }
+
+    #[cfg(miri)]
+    #[test]
+    fn miri_drop_owned_nodes() {
+        #[derive(Clone)]
+        struct OwnedNode(Box<usize>);
+
+        impl Node for OwnedNode {
+            type Value = usize;
+
+            fn initialize(value: &usize) -> Self {
+                Self(Box::new(*value))
+            }
+
+            fn combine(a: &Self, b: &Self) -> Self {
+                Self::initialize(&(*a.0).min(*b.0))
+            }
+
+            fn value(&self) -> &usize {
+                &self.0
+            }
+        }
+
+        let values = [OwnedNode::initialize(&42)];
+        drop(Iterative::build(&values));
+    }
+
+    #[test]
+    fn update_drop_panic_leaves_tree_safe_to_destroy() {
+        use core::sync::atomic::{AtomicUsize, Ordering};
+        use std::panic::{AssertUnwindSafe, catch_unwind};
+
+        static PANIC_VALUE: AtomicUsize = AtomicUsize::new(0);
+
+        #[derive(Clone)]
+        struct OwnedNode(Box<usize>);
+
+        impl Node for OwnedNode {
+            type Value = usize;
+
+            fn initialize(value: &usize) -> Self {
+                Self(Box::new(*value))
+            }
+
+            fn combine(a: &Self, b: &Self) -> Self {
+                Self::initialize(&(*a.0 + *b.0))
+            }
+
+            fn value(&self) -> &usize {
+                &self.0
+            }
+        }
+
+        impl Drop for OwnedNode {
+            fn drop(&mut self) {
+                if PANIC_VALUE
+                    .compare_exchange(*self.0, 0, Ordering::SeqCst, Ordering::SeqCst)
+                    .is_ok()
+                {
+                    panic!("old node destructor panicked");
+                }
+            }
+        }
+
+        // Exercise replacement of both a leaf and an internal node. Box makes
+        // stale-slot destruction detectable as a double free under Miri.
+        for (n, panic_value) in [(1, 1), (2, 3)] {
+            let values: Vec<_> = (1..=n).map(|value| OwnedNode::initialize(&value)).collect();
+            let mut tree = Iterative::build(&values);
+            PANIC_VALUE.store(panic_value, Ordering::SeqCst);
+            assert!(catch_unwind(AssertUnwindSafe(|| tree.update(0, &4))).is_err());
+            assert_eq!(tree.query(0, 0).unwrap().value(), &4);
+            drop(tree);
         }
     }
 

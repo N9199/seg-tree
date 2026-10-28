@@ -11,11 +11,15 @@ use crate::{
 /// Lazy segment tree with range queries and range updates.
 /// It uses `O(n)` space, assuming that each node uses `O(1)` space.
 pub struct LazyRecursive<T> {
-    nodes: Mutex<Vec<T>>,
+    // Only nodes reachable from the root for [0, n) are initialized.
+    nodes: Mutex<Vec<MaybeUninit<T>>>,
     n: usize,
 }
 
-impl<T: LazyNode + Clone> LazyRecursive<T> {
+impl<T> LazyRecursive<T>
+where
+    T: LazyNode + Clone,
+{
     /// Builds lazy segment tree from slice, each element of the slice will correspond to a leaf of the segment tree.
     /// It has time complexity of `O(n*log(n))`, assuming that [`combine`](Node::combine) has constant time complexity.
     pub fn build(values: &[T]) -> Self {
@@ -30,14 +34,7 @@ impl<T: LazyNode + Clone> LazyRecursive<T> {
         // SAFETY: As the nodes are of type `MaybeUninit<T>` this is safe.
         unsafe { nodes.set_len(4 * n) };
         Self::build_helper(0, 0, n - 1, values, &mut nodes);
-        let ptr = nodes.as_mut_ptr();
-        let len = nodes.len();
-        let cap = nodes.capacity();
-        debug_assert_eq!(len, cap);
-        debug_assert_eq!(len, 4 * n);
-        core::mem::forget(nodes);
-        // SAFETY: Only the nodes that were initialized will be accessed, making this safe.
-        let nodes = Mutex::new(unsafe { Vec::from_raw_parts(ptr.cast::<T>(), len, cap) });
+        let nodes = Mutex::new(nodes);
         Self { nodes, n }
     }
 
@@ -75,13 +72,18 @@ impl<T: LazyNode + Clone> LazyRecursive<T> {
             nodes.len()
         );
         let (parent_slice, sons_slice) = nodes.split_at_mut(u + 1);
-        if let Some(value) = parent_slice[u].pending()
+        // SAFETY: Traversal reaches only nodes initialized by build_helper.
+        let parent = unsafe { parent_slice[u].assume_init_mut() };
+        if let Some(value) = parent.pending()
             && range.start != range.last
         {
-            sons_slice[u].defer(value); // At 2*u + 1 - (u + 1)
-            sons_slice[u + 1].defer(value); // At 2*u + 2 - (u + 1)
+            // SAFETY: A non-leaf's two children are initialized and disjoint from its parent.
+            unsafe {
+                sons_slice[u].assume_init_mut().defer(value);
+                sons_slice[u + 1].assume_init_mut().defer(value);
+            }
         }
-        nodes[u].apply_pending(range);
+        parent.apply_pending(range);
     }
 
     /// Updates the range `[i,j]` with value.
@@ -111,10 +113,14 @@ impl<T: LazyNode + Clone> LazyRecursive<T> {
             return;
         }
         if query_range.start <= index_range.start && index_range.last <= query_range.last {
-            self.nodes
-                .get_mut()
-                .expect("Mutex is poisoned, thread should crash")[curr_node]
-                .defer(value);
+            // SAFETY: This reachable node is initialized.
+            unsafe {
+                self.nodes
+                    .get_mut()
+                    .expect("Mutex is poisoned, thread should crash")[curr_node]
+                    .assume_init_mut()
+            }
+            .defer(value);
             self.push(curr_node, index_range);
             return;
         }
@@ -144,7 +150,15 @@ impl<T: LazyNode + Clone> LazyRecursive<T> {
             .nodes
             .get_mut()
             .expect("Mutex is poisoned, thread should crash");
-        nodes[curr_node] = Node::combine(&nodes[left_node], &nodes[right_node]);
+        // SAFETY: Both children and their parent are reachable, initialized nodes.
+        let replacement = unsafe {
+            Node::combine(
+                nodes[left_node].assume_init_ref(),
+                nodes[right_node].assume_init_ref(),
+            )
+        };
+        // Assignment keeps the slot initialized even if dropping its old value panics.
+        unsafe { *nodes[curr_node].assume_init_mut() = replacement };
     }
 
     /// Returns the result from the range `[left,right]`.
@@ -180,12 +194,12 @@ impl<T: LazyNode + Clone> LazyRecursive<T> {
         self.push(curr_node, index_range);
 
         if query_range.start <= index_range.start && index_range.last <= query_range.last {
-            return Some(
-                self.nodes
-                    .lock()
-                    .expect("Mutex is poisoned, thread should crash")[curr_node]
-                    .clone(),
-            );
+            let nodes = self
+                .nodes
+                .lock()
+                .expect("Mutex is poisoned, thread should crash");
+            // SAFETY: The query follows only reachable, initialized nodes.
+            return Some(unsafe { nodes[curr_node].assume_init_ref() }.clone());
         }
         match (
             self.query_helper(
@@ -210,6 +224,35 @@ impl<T: LazyNode + Clone> LazyRecursive<T> {
             (None, Some(ans_right)) => Some(ans_right),
             (None, None) => None,
         }
+    }
+}
+
+impl<T> LazyRecursive<T> {
+    #[inline]
+    fn drop_helper(curr_node: usize, i: usize, j: usize, nodes: &mut [MaybeUninit<T>]) {
+        if i < j {
+            let mid = usize::midpoint(i, j);
+            let left_node = 2 * curr_node + 1;
+            let right_node = 2 * curr_node + 2;
+            Self::drop_helper(left_node, i, mid, nodes);
+            Self::drop_helper(right_node, mid + 1, j, nodes);
+        }
+        // SAFETY: Only initialized nodes are visited, each exactly once.
+        unsafe { nodes[curr_node].assume_init_drop() };
+    }
+}
+
+impl<T> Drop for LazyRecursive<T> {
+    fn drop(&mut self) {
+        if self.n == 0 {
+            return;
+        }
+        let n = self.n;
+        let nodes = self
+            .nodes
+            .get_mut()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        Self::drop_helper(0, 0, n - 1, nodes);
     }
 }
 
@@ -254,7 +297,8 @@ where
             .nodes
             .lock()
             .expect("Mutex is poisoned, thread should crash");
-        let left_node = node_lock.get(left_node_index)?;
+        // SAFETY: This reachable child is initialized, including after push.
+        let left_node = unsafe { node_lock.get(left_node_index)?.assume_init_ref() };
         let temp_node = carry_node
             .as_ref()
             .map_or_else(|| (*left_node).clone(), |v| T::combine(v, left_node));
@@ -302,7 +346,8 @@ where
             .nodes
             .lock()
             .expect("Mutex is poisoned, thread should crash");
-        let left_node = node_lock.get(left_node_index)?;
+        // SAFETY: This reachable child is initialized, including after push.
+        let left_node = unsafe { node_lock.get(left_node_index)?.assume_init_ref() };
         let temp_node = carry_node
             .as_ref()
             .map_or_else(|| (*left_node).clone(), |v| T::combine(v, left_node));
@@ -348,7 +393,8 @@ where
             .nodes
             .lock()
             .expect("Mutex is poisoned, thread should crash");
-        let left_node = node_lock.get(left_node_index)?;
+        // SAFETY: This reachable child is initialized, including after push.
+        let left_node = unsafe { node_lock.get(left_node_index)?.assume_init_ref() };
         let temp_node = carry_node
             .as_ref()
             .map_or_else(|| (*left_node).clone(), |v| T::combine(v, left_node));
@@ -422,7 +468,10 @@ where
                         .lock()
                         .expect("Mutex is poisoned, thread should crash"),
                     |nodes, f| {
-                        recursive_visitor(0, 0, self.n - 1, f, nodes);
+                        if self.n > 0 {
+                            // SAFETY: Build initializes every node reached by this traversal.
+                            unsafe { recursive_visitor(0, 0, self.n - 1, f, nodes) };
+                        }
                     },
                 ),
             )
@@ -440,6 +489,89 @@ mod tests {
     use super::LazyRecursive;
 
     type LSMin<T: Ord + Clone> = LazySetWrapper<Min<T>>;
+
+    #[cfg(miri)]
+    #[derive(Clone)]
+    struct DropNode {
+        value: Box<usize>,
+        pending: Option<usize>,
+    }
+
+    #[cfg(miri)]
+    impl Node for DropNode {
+        type Value = usize;
+
+        fn initialize(value: &usize) -> Self {
+            Self {
+                value: Box::new(*value),
+                pending: None,
+            }
+        }
+
+        fn combine(a: &Self, b: &Self) -> Self {
+            Self::initialize(&(*a.value + *b.value))
+        }
+
+        fn value(&self) -> &usize {
+            &self.value
+        }
+    }
+
+    #[cfg(miri)]
+    impl crate::traits::LazyNode for DropNode {
+        type Update = usize;
+
+        fn pending(&self) -> Option<&usize> {
+            self.pending.as_ref()
+        }
+
+        fn defer(&mut self, update: &usize) {
+            *self.pending.get_or_insert(0) += update;
+        }
+
+        fn apply_pending(&mut self, range: core::range::RangeInclusive<usize>) {
+            if let Some(update) = self.pending.take() {
+                *self.value += update * (range.last - range.start + 1);
+            }
+        }
+    }
+
+    #[cfg(miri)]
+    impl Drop for DropNode {
+        fn drop(&mut self) {
+            std::hint::black_box(*self.value);
+        }
+    }
+
+    #[test]
+    fn drop_empty_tree_does_not_panic() {
+        drop(LazyRecursive::<LSMin<usize>>::build(&[]));
+    }
+
+    #[cfg(miri)]
+    #[test]
+    fn miri_drop_owned_nodes() {
+        for len in [0, 1, 5] {
+            let nodes: Vec<_> = (0..len).map(|x| DropNode::initialize(&x)).collect();
+            let tree = LazyRecursive::build(&nodes);
+            // Destroy reachable initialized nodes, leaving unused slots untouched.
+            drop(tree);
+        }
+    }
+
+    #[cfg(miri)]
+    #[test]
+    fn miri_drop_owned_nodes_after_mutex_poisoning() {
+        let tree = LazyRecursive::build(&[DropNode::initialize(&1)]);
+        // A panicking update can leave the node-storage mutex in this state.
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _guard = tree.nodes.lock().unwrap();
+            panic!("poison node storage for the destruction regression");
+        }));
+        assert!(result.is_err());
+        assert!(tree.nodes.is_poisoned());
+        drop(tree);
+    }
 
     #[test]
     fn build_works() {

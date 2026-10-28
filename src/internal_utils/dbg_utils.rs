@@ -1,3 +1,4 @@
+use core::mem::MaybeUninit;
 use std::marker::PhantomData;
 
 use bit_vec::BitVec;
@@ -51,23 +52,29 @@ where
         formatter.finish()
     }
 }
+/// # Safety
+/// Every node reachable from `curr_node` for the given nonempty range must be initialized.
 #[inline]
-pub fn recursive_visitor<'a, T>(
+pub unsafe fn recursive_visitor<'a, T>(
     curr_node: usize,
     i: usize,
     j: usize,
     f: &mut dyn FnMut(usize, usize, &'a T),
-    nodes: &'a [T],
+    nodes: &'a [MaybeUninit<T>],
 ) where
     T: core::fmt::Debug,
 {
-    f(i, j, &nodes[curr_node]);
+    // SAFETY: The caller guarantees this reachable node is initialized.
+    f(i, j, unsafe { nodes[curr_node].assume_init_ref() });
     if i == j {
         return;
     }
     let mid = usize::midpoint(i, j);
-    recursive_visitor(2 * curr_node + 1, i, mid, f, nodes);
-    recursive_visitor(2 * curr_node + 2, mid + 1, j, f, nodes);
+    // SAFETY: Both child ranges are nonempty and reachable from this node.
+    unsafe {
+        recursive_visitor(2 * curr_node + 1, i, mid, f, nodes);
+        recursive_visitor(2 * curr_node + 2, mid + 1, j, f, nodes);
+    }
 }
 
 #[inline]
