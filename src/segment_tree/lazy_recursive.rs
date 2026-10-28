@@ -87,9 +87,14 @@ where
     }
 
     /// Updates the range `[i,j]` with value.
-    /// It will panic if `i` or `j` is not in `[0,n)`.
+    /// Intersects the inclusive range with the original slice. Does nothing if
+    /// the intersection or tree is empty.
     /// It has time complexity of `O(log(n))`, assuming that [`combine`](Node::combine), [`defer`](LazyNode::defer) and [`apply_pending`](LazyNode::apply_pending) have constant time complexity.
     pub fn update(&mut self, i: usize, j: usize, value: &<T as LazyNode>::Update) {
+        if self.n == 0 || i > j || i >= self.n {
+            return;
+        }
+        let j = j.min(self.n - 1);
         self.update_helper(
             RangeInclusive { start: i, last: j },
             value,
@@ -576,6 +581,52 @@ mod tests {
         assert!(result.is_err());
         assert!(tree.nodes.is_poisoned());
         drop(tree);
+    }
+
+    #[test]
+    fn update_right_out_of_bounds_is_normalized() {
+        let nodes: Vec<LSMin<usize>> = (0..3).map(|x| LSMin::initialize(&x)).collect();
+        let mut tree = LazyRecursive::build(&nodes);
+        tree.update(0, 3, &9);
+        assert_eq!(*tree.query(0, 2).unwrap().value(), 9);
+    }
+
+    #[test]
+    fn update_left_out_of_bounds_does_nothing() {
+        let nodes: Vec<LSMin<usize>> = (0..3).map(|x| LSMin::initialize(&x)).collect();
+        let mut tree = LazyRecursive::build(&nodes);
+        tree.update(3, usize::MAX, &9);
+        assert_eq!(*tree.query(0, 2).unwrap().value(), 0);
+    }
+
+    #[test]
+    fn empty_tree_debug_does_not_panic() {
+        let tree = LazyRecursive::<LSMin<usize>>::build(&[]);
+        assert_eq!(format!("{tree:?}"), "LazyRecursive { n: 0, nodes: {} }");
+    }
+
+    #[test]
+    fn singleton_and_non_power_of_two_match_slice() {
+        for mut values in [vec![7usize], vec![8, 3, 9, 2, 6]] {
+            let nodes: Vec<LSMin<usize>> = values.iter().map(LSMin::initialize).collect();
+            let mut tree = LazyRecursive::build(&nodes);
+            for replacement in [None, Some(11)] {
+                if let Some(value) = replacement {
+                    let last = values.len() - 1;
+                    let first = last / 2;
+                    values[first..=last].fill(value);
+                    tree.update(first, last, &value);
+                }
+                for left in 0..values.len() {
+                    for right in left..values.len() {
+                        assert_eq!(
+                            tree.query(left, right).unwrap().value(),
+                            values[left..=right].iter().min().unwrap()
+                        );
+                    }
+                }
+            }
+        }
     }
 
     #[test]

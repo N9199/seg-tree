@@ -38,10 +38,12 @@ where
     }
 
     /// Sets the i-th element of the segment tree to value T and update the segment tree correspondingly.
-    /// It will panic if i is not in `[0,n)`
+    /// Does nothing if `i` is outside the original slice, including an empty tree.
     /// It has time complexity of `O(log(n))`, assuming that [`combine`](Node::combine) has constant time complexity.
     pub fn update(&mut self, i: usize, value: &<T as Node>::Value) {
-        assert!(i < self.n, "update index out of bounds");
+        if i >= self.n {
+            return;
+        }
         let mut i = i;
         i += self.n;
         let value = Node::initialize(value);
@@ -275,10 +277,10 @@ mod tests {
         assert!(segment_tree.query(10, 0).is_none());
     }
     #[test]
-    #[should_panic(expected = "update index out of bounds")]
-    fn update_out_of_bounds_panics() {
+    fn update_out_of_bounds_does_nothing() {
         let mut tree = Iterative::build(&[Min::initialize(&0usize)]);
         tree.update(1, &1);
+        assert_eq!(*tree.query(0, 0).unwrap().value(), 0);
     }
 
     #[test]

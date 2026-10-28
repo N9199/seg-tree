@@ -103,9 +103,14 @@ where
     }
 
     /// Creates a new segment tree version from version were the p-th element of the segment tree to value T and update the segment tree correspondingly.
-    /// It will panic if p is not in `[0,n)`, or if version is not in <code>[0,[versions](Self::versions))</code>.
+    /// Does nothing if `p` is outside the original slice, including an empty tree;
+    /// in that case no version is created and `version` is not checked.
+    /// Otherwise, panics if `version` is not in `0..self.versions()`.
     /// It has time complexity of `O(log(n))`, assuming that [`combine`](Node::combine) has constant time complexity.
     pub fn update(&mut self, version: usize, p: usize, value: &<T as Node>::Value) {
+        if p >= self.n {
+            return;
+        }
         let new_root = self.update_helper(self.roots[version], p, value, 0, self.n - 1);
         self.roots.push(new_root);
     }
@@ -253,6 +258,62 @@ mod tests {
         traits::Node,
         utils::Sum,
     };
+
+    #[test]
+    fn update_out_of_bounds_does_not_create_a_version() {
+        let nodes: Vec<Sum<usize>> = (0..3).map(|x| Sum::initialize(&x)).collect();
+        let mut tree = Persistent::build(&nodes);
+        tree.update(0, 3, &9);
+        assert_eq!(tree.versions(), 1);
+        assert_eq!(*tree.query(0, 0, 2).unwrap().value(), 3);
+    }
+
+    #[test]
+    #[should_panic]
+    fn query_invalid_version_panics() {
+        let tree = Persistent::build(&[Sum::initialize(&7usize)]);
+        tree.query(tree.versions(), 0, 0);
+    }
+
+    #[test]
+    #[should_panic]
+    fn update_invalid_version_panics() {
+        let mut tree = Persistent::build(&[Sum::initialize(&7usize)]);
+        tree.update(tree.versions(), 0, &9);
+    }
+
+    #[test]
+    fn empty_tree_debug_does_not_panic() {
+        let tree = Persistent::<Sum<usize>>::build(&[]);
+        assert_eq!(format!("{tree:?}"), "Persistent { n: 0, nodes: {} }");
+    }
+
+    #[test]
+    fn singleton_and_non_power_of_two_preserve_versions() {
+        for values in [vec![7usize], vec![8, 3, 9, 2, 6]] {
+            let nodes: Vec<_> = values.iter().map(Sum::initialize).collect();
+            let mut tree = Persistent::build(&nodes);
+            assert_eq!(tree.versions(), 1);
+            let last = values.len() - 1;
+            tree.update(0, last, &11);
+            tree.update(0, 0, &13);
+            assert_eq!(tree.versions(), 3);
+            let mut updated = values.clone();
+            updated[last] = 11;
+            let mut branched = values.clone();
+            branched[0] = 13;
+            for (version, expected) in [values, updated, branched].iter().enumerate() {
+                for left in 0..expected.len() {
+                    for right in left..expected.len() {
+                        assert_eq!(
+                            *tree.query(version, left, right).unwrap().value(),
+                            expected[left..=right].iter().sum::<usize>()
+                        );
+                    }
+                }
+            }
+        }
+    }
 
     #[test]
     fn non_empty_query_returns_some() {

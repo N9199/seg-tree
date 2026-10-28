@@ -170,15 +170,17 @@ where
 
     /// Creates a new segment tree version by applying `value` to the inclusive range `[left, right]` in `version`.
     ///
-    /// The new version has index `self.versions() - 1` after the call; existing
-    /// versions retain their values.
+    /// Intersects the inclusive range with the original slice. If the intersection
+    /// or tree is empty, does nothing: no version is created and `version` is not checked.
+    /// Otherwise, the new version has index `self.versions() - 1` after the call;
+    /// existing versions retain their values.
     ///
     /// Takes `O(log(n + 1))` time, assuming cloning, [`combine`](Node::combine),
     /// [`defer`](LazyNode::defer), and [`apply_pending`](LazyNode::apply_pending)
     /// take constant time.
     ///
     /// # Panics
-    /// Panics if `version` is not in `0..self.versions()`.
+    /// Panics if the intersection is nonempty and `version` is not in `0..self.versions()`.
     pub fn update(
         &mut self,
         version: usize,
@@ -186,6 +188,10 @@ where
         right: usize,
         value: &<T as LazyNode>::Update,
     ) {
+        if self.n == 0 || left > right || left >= self.n {
+            return;
+        }
+        let right = right.min(self.n - 1);
         let new_root = self.update_helper(
             self.roots[version],
             RangeInclusive {
@@ -746,6 +752,37 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    #[should_panic]
+    fn query_panics_when_version_equals_version_count() {
+        let nodes = vec![LazySum::<usize>::initialize(&0); 2];
+        let mut segment_tree = LazyPersistent::build(&nodes);
+        let invalid_version = segment_tree.versions();
+        segment_tree.query(invalid_version, 0, 1);
+    }
+
+    #[test]
+    #[should_panic]
+    fn update_panics_when_version_equals_version_count() {
+        let nodes = vec![LazySum::<usize>::initialize(&0); 2];
+        let mut segment_tree = LazyPersistent::build(&nodes);
+        let invalid_version = segment_tree.versions();
+        segment_tree.update(invalid_version, 0, 1, &5);
+    }
+
+    #[test]
+    fn empty_tree_has_no_versions() {
+        let segment_tree = LazyPersistent::<LazySum<usize>>::build(&[]);
+        assert_eq!(segment_tree.versions(), 0);
+    }
+
+    #[test]
+    fn empty_tree_update_does_not_create_a_version() {
+        let mut segment_tree = LazyPersistent::<LazySum<usize>>::build(&[]);
+        segment_tree.update(0, 0, 0, &5);
+        assert_eq!(segment_tree.versions(), 0);
     }
 
     #[test]

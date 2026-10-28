@@ -66,9 +66,12 @@ where
     }
 
     /// Sets the p-th element of the segment tree to value T and update the segment tree correspondingly.
-    /// It will panic if p is not in `[0,n)`
+    /// Does nothing if `p` is outside the original slice, including an empty tree.
     /// It has time complexity of `O(log(n))`, assuming that [`combine`](Node::combine) has constant time complexity.
     pub fn update(&mut self, p: usize, value: &<T as Node>::Value) {
+        if p >= self.n {
+            return;
+        }
         self.update_helper(p, value, 0, 0, self.n - 1);
     }
 
@@ -467,6 +470,36 @@ mod tests {
             format!("{:?}", Recursive::<Min<usize>>::build(&[])),
             "Recursive { n: 0, nodes: {} }"
         );
+    }
+
+    #[test]
+    fn update_out_of_bounds_does_nothing() {
+        let mut tree = Recursive::build(&vec![Min::initialize(&1usize); 3]);
+        tree.update(3, &2);
+        assert_eq!(*tree.query(0, 2).unwrap().value(), 1);
+    }
+
+    #[test]
+    fn singleton_and_non_power_of_two_match_slice() {
+        for mut values in [vec![7usize], vec![8, 3, 9, 2, 6]] {
+            let nodes: Vec<_> = values.iter().map(Min::initialize).collect();
+            let mut tree = Recursive::build(&nodes);
+            for replacement in [None, Some(11)] {
+                if let Some(value) = replacement {
+                    let last = values.len() - 1;
+                    values[last] = value;
+                    tree.update(last, &value);
+                }
+                for left in 0..values.len() {
+                    for right in left..values.len() {
+                        assert_eq!(
+                            tree.query(left, right).unwrap().value(),
+                            values[left..=right].iter().min().unwrap()
+                        );
+                    }
+                }
+            }
+        }
     }
 
     #[test]
