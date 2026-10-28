@@ -2,31 +2,87 @@ name: Rust
 
 on:
   push:
-    branches: [ main ]
+    branches: [main, dev]
   pull_request:
-    branches: [ main ]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
 
 jobs:
   test:
-
+    name: Stable checks and tests
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
-    - uses: actions/checkout@v2
-    - name: Clippy
-      run: cargo clippy
-    - name: Build
-      run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
-    - name: Run tests with all features
-      run: cargo test --all-features --verbose
-    - name: Check documentation
-      env:
-        RUSTDOCFLAGS: -D warnings
-      run: |
-        cargo doc --no-deps
-        cargo doc --no-deps --all-features
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: stable
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Clippy
+        run: cargo clippy --all-targets --all-features
+      - name: Run tests with default features
+        run: cargo nextest run --no-fail-fast
+      - name: Run tests with all features
+        run: cargo nextest run --all-features --no-fail-fast
+      - name: Run doctests
+        run: cargo test --doc --all-features
+      - name: Check documentation
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: |
+          cargo doc --no-deps
+          cargo doc --no-deps --all-features
+
+  msrv:
+    name: Minimum supported Rust (1.100)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.100.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: msrv
+      - name: Check all targets and features
+        run: cargo check --all-targets --all-features
+
+  miri:
+    name: Release-mode Miri
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: miri
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: miri
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - name: Prepare Miri sysroot
+        run: cargo +nightly miri setup
+      - name: Run release-mode Miri tests with all features
+        run: cargo +nightly miri nextest run --release --all-features --no-fail-fast
