@@ -73,7 +73,7 @@ where
     type Update = <Sum<T> as Node>::Value;
 
     #[inline]
-    fn pending(&mut self) -> Option<&Self::Update> {
+    fn pending(&self) -> Option<&Self::Update> {
         self.update.as_ref()
     }
 

@@ -10,8 +10,8 @@ use super::Node;
 pub trait LazyNode: Node {
     type Update: Clone;
 
-    /// Peeks at this node's pending update, if any, clearing it.
-    fn pending(&mut self) -> Option<&Self::Update>;
+    /// Peeks at this node's pending update
+    fn pending(&self) -> Option<&Self::Update>;
 
     /// Merge an incoming update into this node's pending slot — composing
     /// with anything already pending, adopting it otherwise. Does NOT

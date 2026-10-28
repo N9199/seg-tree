@@ -63,7 +63,7 @@ where
 {
     type Update = <T as LazyNode>::Update;
 
-    fn pending(&mut self) -> Option<&Self::Update> {
+    fn pending(&self) -> Option<&Self::Update> {
         self.node.pending()
     }
 
