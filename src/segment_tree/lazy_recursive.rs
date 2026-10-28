@@ -491,14 +491,10 @@ mod tests {
     #[cfg(feature = "bifurcate")]
     use crate::internal_utils::test_utils::assert_prefix_search_matches;
     use crate::{
-        internal_utils::test_utils::assert_range_matches,
-        traits::Node,
-        utils::{LazySetWrapper, Min},
+        internal_utils::test_utils::assert_range_matches, traits::Node, utils::LazyMin as LSMin,
     };
 
     use super::LazyRecursive;
-
-    type LSMin<T: Ord + Clone> = LazySetWrapper<Min<T>>;
 
     #[cfg(miri)]
     #[derive(Clone)]
@@ -707,7 +703,7 @@ mod tests {
         let mut segment_tree = LazyRecursive::build(&nodes);
         segment_tree.update(0, 1, &2);
         let dbg = format!("{segment_tree:?}");
-        let expected = "LazyRecursive { n: 11, nodes: {[0, 10]: LazySetWrapper { node: Min { value: 2 }, lazy_value: None }, [0, 5]: LazySetWrapper { node: Min { value: 2 }, lazy_value: None }, [0, 2]: LazySetWrapper { node: Min { value: 2 }, lazy_value: None }, [0, 1]: LazySetWrapper { node: Min { value: 2 }, lazy_value: None }, [0, 0]: LazySetWrapper { node: Min { value: 0 }, lazy_value: Some(2) }, [1, 1]: LazySetWrapper { node: Min { value: 1 }, lazy_value: Some(2) }, [2, 2]: LazySetWrapper { node: Min { value: 2 }, lazy_value: None }, [3, 5]: LazySetWrapper { node: Min { value: 3 }, lazy_value: None }, [3, 4]: LazySetWrapper { node: Min { value: 3 }, lazy_value: None }, [3, 3]: LazySetWrapper { node: Min { value: 3 }, lazy_value: None }, [4, 4]: LazySetWrapper { node: Min { value: 4 }, lazy_value: None }, [5, 5]: LazySetWrapper { node: Min { value: 5 }, lazy_value: None }, [6, 10]: LazySetWrapper { node: Min { value: 6 }, lazy_value: None }, [6, 8]: LazySetWrapper { node: Min { value: 6 }, lazy_value: None }, [6, 7]: LazySetWrapper { node: Min { value: 6 }, lazy_value: None }, [6, 6]: LazySetWrapper { node: Min { value: 6 }, lazy_value: None }, [7, 7]: LazySetWrapper { node: Min { value: 7 }, lazy_value: None }, [8, 8]: LazySetWrapper { node: Min { value: 8 }, lazy_value: None }, [9, 10]: LazySetWrapper { node: Min { value: 9 }, lazy_value: None }, [9, 9]: LazySetWrapper { node: Min { value: 9 }, lazy_value: None }, [10, 10]: LazySetWrapper { node: Min { value: 10 }, lazy_value: None }} }";
+        let expected = "LazyRecursive { n: 11, nodes: {[0, 10]: LazyMin { value: 2, update: None }, [0, 5]: LazyMin { value: 2, update: None }, [0, 2]: LazyMin { value: 2, update: None }, [0, 1]: LazyMin { value: 2, update: None }, [0, 0]: LazyMin { value: 0, update: Some(2) }, [1, 1]: LazyMin { value: 1, update: Some(2) }, [2, 2]: LazyMin { value: 2, update: None }, [3, 5]: LazyMin { value: 3, update: None }, [3, 4]: LazyMin { value: 3, update: None }, [3, 3]: LazyMin { value: 3, update: None }, [4, 4]: LazyMin { value: 4, update: None }, [5, 5]: LazyMin { value: 5, update: None }, [6, 10]: LazyMin { value: 6, update: None }, [6, 8]: LazyMin { value: 6, update: None }, [6, 7]: LazyMin { value: 6, update: None }, [6, 6]: LazyMin { value: 6, update: None }, [7, 7]: LazyMin { value: 7, update: None }, [8, 8]: LazyMin { value: 8, update: None }, [9, 10]: LazyMin { value: 9, update: None }, [9, 9]: LazyMin { value: 9, update: None }, [10, 10]: LazyMin { value: 10, update: None }} }";
         pretty_assertions::assert_eq!(dbg, expected);
     }
 

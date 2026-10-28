@@ -459,7 +459,7 @@ mod tests {
                 .is_err()
             );
             assert_eq!(*tree.query(0, 0).unwrap().value, 10);
-            assert!(!format!("{tree:?}").is_empty());
+            assert_ne!(format!("{tree:?}"), "");
             drop(tree);
         }
     }

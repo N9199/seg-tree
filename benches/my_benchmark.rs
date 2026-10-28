@@ -8,11 +8,10 @@ use criterion::{
 use rand::{Rng, distributions::Uniform, prelude::Distribution};
 use seg_tree::{
     traits::Node,
-    utils::{LazySetWrapper, Min},
+    utils::{LazyMin as LSMin, Min},
     *,
 };
 
-type LSMin<T> = LazySetWrapper<Min<T>>;
 const N: i64 = 1_000_000;
 
 pub fn recursive_segment_tree_queries_benchmark(c: &mut Criterion) {

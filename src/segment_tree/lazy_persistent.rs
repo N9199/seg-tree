@@ -307,18 +307,17 @@ where
     /// assert_eq!(*tree.query(0, 0, 3).unwrap().value(), 10);
     /// assert_eq!(tree.versions(), 3);
     /// ```
-    /// The final example finds the first position whose value is at least a target.
+    /// The final example finds the first position whose value is at most a target.
     /// ```
-    /// # use seg_tree::{LazyPersistent,utils::{Max, LazySetWrapper},traits::Node};
-    /// # type PMax<T> = LazySetWrapper<Max<T>>;
-    /// let predicate = |left_value:&usize, value:&usize|{*left_value>=*value}; // Is the maximum greater or equal to value?
-    /// let g = |_left_node:&usize,value:usize|{value}; // Do nothing
-    /// # let nodes: Vec<PMax<usize>> = (0..10).map(|x| PMax::initialize(&x)).collect();
-    /// let mut seg_tree = LazyPersistent::build(&nodes); // [0,1,2,3,4,5,6,7,8,9] with Max<usize> nodes
-    /// let index = seg_tree.lower_bound(0, predicate, g, 3); // Will return 3 as 3>=3
-    /// # for i in 0..10{
-    /// #    assert_eq!(seg_tree.lower_bound(0, predicate, g, i), i);
-    /// # }
+    /// use seg_tree::{LazyPersistent, utils::LazyMin, traits::Node};
+    /// let nodes: Vec<LazyMin<usize>> = (0..10).rev().map(|x| LazyMin::initialize(&x)).collect();
+    /// let mut tree = LazyPersistent::build(&nodes); // [9,8,7,6,5,4,3,2,1,0].
+    /// let predicate = |minimum: &usize, target: &usize| minimum <= target;
+    /// let g = |_minimum: &usize, target: usize| target;
+    /// assert_eq!(tree.lower_bound(0, predicate, g, 6), 3);
+    /// tree.update(0, 0, 9, &4); // Assign every element to 4 in version 1.
+    /// assert_eq!(tree.lower_bound(1, predicate, g, 6), 0);
+    /// assert_eq!(tree.lower_bound(0, predicate, g, 6), 3);
     /// ```
     ///
     /// [^note]: A prefix is a segment of the form `[0,i]`.

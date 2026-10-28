@@ -4,7 +4,7 @@ use core::fmt::Debug;
 /// The query adapter can capture a mutable tree and/or a persistent version.
 /// Empty input performs no queries and imposes no empty-tree API policy.
 #[track_caller]
-pub(crate) fn assert_range_matches<Input: Debug, Output: Debug + PartialEq>(
+pub fn assert_range_matches<Input: Debug, Output: Debug + PartialEq>(
     values: &[Input],
     mut query: impl FnMut(usize, usize) -> Output,
     mut expected: impl FnMut(&[Input]) -> Output,
@@ -25,7 +25,7 @@ pub(crate) fn assert_range_matches<Input: Debug, Output: Debug + PartialEq>(
 /// Search adapters normalize their result to `Option<usize>`. APIs that cannot
 /// represent a missing match should use targets with a matching prefix.
 #[track_caller]
-pub(crate) fn assert_prefix_search_matches<Input: Debug, Target: Debug>(
+pub fn assert_prefix_search_matches<Input: Debug, Target: Debug>(
     values: &[Input],
     targets: impl IntoIterator<Item = Target>,
     mut search: impl FnMut(&Target) -> Option<usize>,
