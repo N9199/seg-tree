@@ -80,28 +80,28 @@ where
             if l & 1 != 0 {
                 // SAFETY: The query traversal selects an initialized slot.
                 let selected = unsafe { self.nodes[l].assume_init_ref() };
-                ans_left = Some(ans_left.map_or_else(
-                    || Node::initialize(selected.value()),
-                    |node| Node::combine(&node, selected),
-                ));
+                ans_left = Some(
+                    ans_left
+                        .map_or_else(|| selected.clone(), |node| Node::combine(&node, selected)),
+                );
                 l += 1;
             }
             if r & 1 != 0 {
                 r -= 1;
                 // SAFETY: The query traversal selects an initialized slot.
                 let selected = unsafe { self.nodes[r].assume_init_ref() };
-                ans_right = Some(ans_right.map_or_else(
-                    || Node::initialize(selected.value()),
-                    |node| Node::combine(selected, &node),
-                ));
+                ans_right = Some(
+                    ans_right
+                        .map_or_else(|| selected.clone(), |node| Node::combine(selected, &node)),
+                );
             }
             l >>= 1;
             r >>= 1;
         }
         match (ans_left, ans_right) {
             (Some(ans_left), Some(ans_right)) => Some(Node::combine(&ans_left, &ans_right)),
-            (Some(ans_left), None) => Some(Node::initialize(ans_left.value())),
-            (None, Some(ans_right)) => Some(Node::initialize(ans_right.value())),
+            (Some(ans_left), None) => Some(ans_left),
+            (None, Some(ans_right)) => Some(ans_right),
             (None, None) => None,
         }
     }
@@ -162,6 +162,92 @@ mod tests {
     use crate::{traits::Node, utils::Min};
 
     use super::Iterative;
+
+    #[test]
+    fn query_preserves_max_subarray_aggregate() {
+        use crate::utils::MaxSubArraySum;
+
+        let nodes: Vec<_> = [0, 0, 4, -5, -5, 4, 0, 0]
+            .iter()
+            .map(MaxSubArraySum::initialize)
+            .collect();
+        let tree = Iterative::build(&nodes);
+        assert_eq!(*tree.query(2, 5).unwrap().value(), 4);
+    }
+
+    #[test]
+    fn query_preserves_hidden_node_state() {
+        use crate::utils::MaxSubArraySum;
+
+        let nodes: Vec<_> = [4, -5].iter().map(MaxSubArraySum::initialize).collect();
+        let expected = MaxSubArraySum::combine(&nodes[0], &nodes[1]);
+        let tree = Iterative::build(&nodes);
+        assert_eq!(tree.query(0, 1).unwrap(), expected);
+    }
+
+    #[test]
+    fn all_ranges_preserve_aggregate_state_after_updates() {
+        use crate::utils::MaxSubArraySum;
+
+        for mut values in [
+            vec![4],
+            vec![4, -5],
+            vec![-4, -3, -2],
+            vec![4, -5, -5, 4, 2],
+            vec![0, 0, 4, -5, -5, 4, 0, 0],
+            vec![3, -4, 2, 0, -6, 5, -1, 4, -2],
+        ] {
+            let nodes: Vec<_> = values.iter().map(MaxSubArraySum::initialize).collect();
+            let mut tree = Iterative::build(&nodes);
+            for update in [None, Some((0, -7)), Some((values.len() - 1, 6))] {
+                if let Some((index, value)) = update {
+                    values[index] = value;
+                    tree.update(index, &value);
+                }
+                for left in 0..values.len() {
+                    for right in left..values.len() {
+                        let mut leaves =
+                            values[left..=right].iter().map(MaxSubArraySum::initialize);
+                        let first = leaves.next().unwrap();
+                        let expected = leaves.fold(first, |a, b| MaxSubArraySum::combine(&a, &b));
+                        assert_eq!(
+                            tree.query(left, right).unwrap(),
+                            expected,
+                            "values {values:?}, range [{left}, {right}]"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn query_preserves_noncommutative_order() {
+        use crate::utils::Sum;
+
+        #[derive(Clone, Copy, Debug, PartialEq)]
+        struct Digits {
+            value: usize,
+            len: u32,
+        }
+
+        impl std::ops::Add for Digits {
+            type Output = Self;
+
+            fn add(self, rhs: Self) -> Self {
+                Self {
+                    value: self.value * 10_usize.pow(rhs.len) + rhs.value,
+                    len: self.len + rhs.len,
+                }
+            }
+        }
+
+        let nodes: Vec<_> = (1..=7)
+            .map(|value| Sum::initialize(&Digits { value, len: 1 }))
+            .collect();
+        let tree = Iterative::build(&nodes);
+        assert_eq!(tree.query(1, 5).unwrap().value().value, 23456);
+    }
 
     #[test]
     fn non_empty_query_returns_some() {
