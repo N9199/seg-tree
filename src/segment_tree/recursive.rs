@@ -1,5 +1,5 @@
 use core::mem::MaybeUninit;
-#[cfg(any(feature = "bifurcate", doc))]
+#[cfg(feature = "bifurcate")]
 use core::ops::Range;
 
 use crate::{
@@ -195,11 +195,10 @@ where
     }
 }
 
-#[cfg(any(feature = "bifurcate", doc))]
-#[doc(cfg(feature = "bifurcate"))]
+#[cfg(feature = "bifurcate")]
 use bifurcate::{Bisectable, MidPoint};
 
-#[cfg(any(feature = "bifurcate", doc))]
+#[cfg(feature = "bifurcate")]
 impl<T> Recursive<T>
 where
     T: Node + Clone,
@@ -310,9 +309,10 @@ where
     }
 }
 
-#[cfg(any(feature = "bifurcate", doc))]
+#[cfg(feature = "bifurcate")]
 /// **NOTE**: This implementation searches through prefixes,
 /// not through the underlying elements themselves
+#[cfg_attr(docsrs, doc(cfg(feature = "bifurcate")))]
 impl<T> Bisectable for Recursive<T>
 where
     T: Node + Clone,

@@ -1,5 +1,5 @@
 use core::mem::MaybeUninit;
-#[cfg(any(feature = "bifurcate", doc))]
+#[cfg(feature = "bifurcate")]
 use core::ops::Range;
 use std::{range::RangeInclusive, sync::Mutex};
 
@@ -258,11 +258,10 @@ impl<T> Drop for LazyRecursive<T> {
     }
 }
 
-#[cfg(any(feature = "bifurcate", doc))]
-#[doc(cfg(feature = "bifurcate"))]
+#[cfg(feature = "bifurcate")]
 use bifurcate::{Bisectable, MidPoint};
 
-#[cfg(any(feature = "bifurcate", doc))]
+#[cfg(feature = "bifurcate")]
 impl<T> LazyRecursive<T>
 where
     T: LazyNode + Clone,
@@ -421,7 +420,8 @@ where
     }
 }
 
-#[cfg(any(feature = "bifurcate", doc))]
+#[cfg(feature = "bifurcate")]
+#[cfg_attr(docsrs, doc(cfg(feature = "bifurcate")))]
 impl<T> Bisectable for LazyRecursive<T>
 where
     T: LazyNode + Clone,

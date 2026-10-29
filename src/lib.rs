@@ -21,7 +21,7 @@
 #![warn(clippy::cargo)]
 #![warn(clippy::nursery)]
 #![warn(missing_docs)]
-#![cfg_attr(any(doc, docsrs), feature(doc_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 /// Segment trees.
 mod segment_tree;
 /// Traits.

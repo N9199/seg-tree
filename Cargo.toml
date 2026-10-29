@@ -15,8 +15,8 @@ exclude = [
 rust-version = "1.92"
 
 [package.metadata.docs.rs]
-features = ["doc", "bifurcate"]
-rustdoc-args = ["--cfg", "docsrs", "--all-features"]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [dev-dependencies]
 criterion = { version = "0.3", features = ["html_reports"] }
