@@ -1,4 +1,4 @@
-use crate::nodes::Node;
+use crate::traits::Node;
 
 /// Implementation of the solution to the maximum subarray problem. It just implements [`Node`].
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -38,15 +38,17 @@ impl Node for MaxSubArraySum {
 
 #[cfg(test)]
 mod tests {
-    use rand::{distributions::Uniform, thread_rng, prelude::Distribution};
+    use rand::{distributions::Uniform, prelude::Distribution, thread_rng};
 
-    use crate::{nodes::Node, utils::MaxSubArraySum};
+    use crate::{traits::Node, utils::MaxSubArraySum};
 
     const N: usize = 1_000;
 
     #[test]
     fn max_sub_array_sum_works() {
-        let random = Uniform::from((i64::MIN / (N as i64))..(i64::MAX / (N as i64)));
+        let random = Uniform::from(
+            (i64::MIN / i64::try_from(N).unwrap())..(i64::MAX / i64::try_from(N).unwrap()),
+        );
         let mut rng = thread_rng();
         let nodes: Vec<i64> = random.sample_iter(&mut rng).take(N).collect();
         // See https://en.wikipedia.org/wiki/Maximum_subarray_problem#Kadane's_algorithm

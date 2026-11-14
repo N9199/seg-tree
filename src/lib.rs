@@ -8,18 +8,28 @@
 //!
 //! This library provides simple and easy to use segment trees and some variations of them, by simply implementing certain traits. It also gives some already implemented nodes types, which serve can also serve as examples.
 //!
+//! # Panic safety
+//!
+//! If cloning or combining a node panics during tree construction, all nodes
+//! initialized so far are destroyed, provided their destructors do not panic.
+//! A tree whose update panicked may retain partially updated aggregates; no
+//! transactional rollback is promised. If a node's destructor panics while a tree
+//! is being destroyed, the remaining nodes are still destroyed. A second destructor
+//! panic during unwinding can abort the process. Destruction and other safe
+//! operations remain memory-safe, even after a caught panic.
+//!
 //! <br>
 #![warn(clippy::all)]
 #![warn(clippy::pedantic)]
 #![warn(clippy::cargo)]
 #![warn(clippy::nursery)]
 #![warn(missing_docs)]
-
-/// Node traits.
-pub mod nodes;
+#![cfg_attr(docsrs, feature(doc_cfg))]
 /// Segment trees.
 mod segment_tree;
+/// Traits.
+pub mod traits;
 pub use segment_tree::*;
+mod internal_utils;
 /// Provided node implementations.
 pub mod utils;
-mod internal_utils;

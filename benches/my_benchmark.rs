@@ -3,16 +3,15 @@
 use std::time::Duration;
 
 use criterion::{
-    black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput,
+    BatchSize, BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main,
 };
-use rand::{distributions::Uniform, prelude::Distribution, Rng};
+use rand::{Rng, distributions::Uniform, prelude::Distribution};
 use seg_tree::{
-    nodes::Node,
-    utils::{LazySetWrapper, Min},
+    traits::Node,
+    utils::{LazyMin as LSMin, Min},
     *,
 };
 
-type LSMin<T> = LazySetWrapper<Min<T>>;
 const N: i64 = 1_000_000;
 
 pub fn recursive_segment_tree_queries_benchmark(c: &mut Criterion) {

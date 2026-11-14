@@ -1,4 +1,4 @@
-use crate::nodes::Node;
+use crate::traits::Node;
 
 /// Implementation of range max for generic type T, it only implements [`Node`].
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -26,7 +26,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{nodes::Node, utils::Max};
+    use crate::{traits::Node, utils::Max};
 
     #[test]
     fn max_works() {

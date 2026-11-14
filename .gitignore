@@ -1,3 +1,4 @@
 /target
 Cargo.lock
 /seg-tree-macros
+.DS_Store
